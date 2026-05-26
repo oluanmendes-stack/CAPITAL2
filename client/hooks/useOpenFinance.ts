@@ -25,7 +25,7 @@ export function useOpenFinance() {
   const isProduction = config.production;
 
   // Conectar com provedor Open Finance
-  const connectProvider = useCallback(async (provider: OpenFinanceProvider): Promise<boolean> => {
+  const connectProvider = useCallback(async (provider: OpenFinanceProvider): Promise<OpenFinanceConnection | null> => {
     setIsConnecting(true);
 
     try {
@@ -55,7 +55,7 @@ export function useOpenFinance() {
         const mockAccounts = generateMockAccounts(provider, newConnection.id);
         setAccounts(prev => [...prev.filter(a => a.provider !== provider), ...mockAccounts]);
 
-        return true;
+        return newConnection;
       }
 
       if (isProduction) {
@@ -71,7 +71,7 @@ export function useOpenFinance() {
 
         // Redirecionar para autorização
         window.location.href = authResponse.authorizationUrl;
-        return true;
+        return null;
       } else {
         // Desenvolvimento: usar dados simulados
         await new Promise(resolve => setTimeout(resolve, 2000));
@@ -94,22 +94,22 @@ export function useOpenFinance() {
         const mockAccounts = generateMockAccounts(provider, newConnection.id);
         setAccounts(prev => [...prev.filter(a => a.provider !== provider), ...mockAccounts]);
 
-        return true;
+        return newConnection;
       }
     } catch (error) {
       console.error('Erro ao conectar provedor:', error);
-      return false;
+      return null;
     } finally {
       setIsConnecting(false);
     }
   }, [isProduction]);
 
   // Sincronizar dados do provedor
-  const syncProvider = useCallback(async (provider: OpenFinanceProvider): Promise<OpenFinanceSyncResult> => {
+  const syncProvider = useCallback(async (provider: OpenFinanceProvider, providedConnection?: OpenFinanceConnection): Promise<OpenFinanceSyncResult> => {
     setIsSyncing(true);
 
     try {
-      const connection = connections.find(c => c.provider === provider);
+      const connection = providedConnection || connections.find(c => c.provider === provider);
       if (!connection || !connection.isConnected) {
         throw new Error('Provedor não conectado');
       }
