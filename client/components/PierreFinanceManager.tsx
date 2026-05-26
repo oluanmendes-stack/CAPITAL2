@@ -372,7 +372,7 @@ export default function PierreFinanceManager({ open, onOpenChange }: PierreFinan
                               </div>
                             ))}
                             {purchase.installments.length > 6 && (
-                              <p className="text-xs text-gray-500 p-2">
+                              <p key={`remaining_${purchaseIdx}`} className="text-xs text-gray-500 p-2">
                                 +{purchase.installments.length - 6} parcelas...
                               </p>
                             )}
