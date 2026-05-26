@@ -9,7 +9,7 @@ import {
   PierreTransaction
 } from '@shared/pierre-types';
 
-const PIERRE_API_BASE = 'https://www.pierre.finance/tools/api';
+const PIERRE_API_BASE = 'https://www.pierre.finance';
 
 class PierreFinanceService {
   private apiKey: string;
@@ -32,7 +32,7 @@ class PierreFinanceService {
   }
 
   async getAccounts(): Promise<OpenFinanceAccount[]> {
-    const url = this.useServerProxy ? '/api/pierre/accounts' : `${PIERRE_API_BASE}/get-accounts`;
+    const url = this.useServerProxy ? '/api/pierre/accounts' : `${PIERRE_API_BASE}/tools/api/get-accounts`;
     const headers = this.useServerProxy ? this.getHeaders() : {
       'Authorization': `Bearer ${this.apiKey}`,
       'Content-Type': 'application/json'
@@ -73,7 +73,7 @@ class PierreFinanceService {
 
     const url = this.useServerProxy
       ? `/api/pierre/transactions?${params.toString()}`
-      : `${PIERRE_API_BASE}/get-transactions?${params.toString()}`;
+      : `${PIERRE_API_BASE}/tools/api/get-transactions?${params.toString()}`;
 
     const headers = this.useServerProxy ? this.getHeaders() : {
       'Authorization': `Bearer ${this.apiKey}`,
@@ -159,7 +159,7 @@ class PierreFinanceService {
   async getInstallments() {
     const url = this.useServerProxy
       ? '/api/pierre/installments'
-      : `${PIERRE_API_BASE}/get-installments`;
+      : `${PIERRE_API_BASE}/tools/api/get-installments`;
 
     const headers = this.useServerProxy ? this.getHeaders() : {
       'Authorization': `Bearer ${this.apiKey}`,

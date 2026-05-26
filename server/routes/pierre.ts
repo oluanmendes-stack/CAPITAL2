@@ -1,6 +1,6 @@
 import { RequestHandler } from 'express';
 
-const PIERRE_API_BASE = 'https://www.pierre.finance/tools/api';
+const PIERRE_API_BASE = 'https://www.pierre.finance';
 
 interface PierreProxyRequest {
   endpoint: 'accounts' | 'transactions';
@@ -22,7 +22,7 @@ export const handlePierreProxy: RequestHandler = async (req, res) => {
 
     // Build query string if params provided
     const queryString = params ? '?' + new URLSearchParams(params).toString() : '';
-    const url = `${PIERRE_API_BASE}/get-${endpoint}${queryString}`;
+    const url = `${PIERRE_API_BASE}/tools/api/get-${endpoint}${queryString}`;
 
     const response = await fetch(url, {
       method: 'GET',
@@ -58,7 +58,7 @@ export const getPierreAccounts: RequestHandler = async (req, res) => {
       return res.status(500).json({ error: 'Pierre API key not configured' });
     }
 
-    const response = await fetch(`${PIERRE_API_BASE}/get-accounts`, {
+    const response = await fetch(`${PIERRE_API_BASE}/tools/api/get-accounts`, {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${apiKey}`,
@@ -100,7 +100,7 @@ export const getPierreTransactions: RequestHandler = async (req, res) => {
     if (categories) params.append('categories', String(categories));
     params.append('format', format as string);
 
-    const url = `${PIERRE_API_BASE}/get-transactions?${params.toString()}`;
+    const url = `${PIERRE_API_BASE}/tools/api/get-transactions?${params.toString()}`;
 
     const response = await fetch(url, {
       method: 'GET',
@@ -136,7 +136,7 @@ export const getPierreInstallments: RequestHandler = async (req, res) => {
       return res.status(500).json({ error: 'Pierre API key not configured' });
     }
 
-    const response = await fetch(`${PIERRE_API_BASE}/get-installments`, {
+    const response = await fetch(`${PIERRE_API_BASE}/tools/api/get-installments`, {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${apiKey}`,
@@ -177,7 +177,7 @@ export const syncPierreData: RequestHandler = async (req, res) => {
 
     // Fetch accounts
     try {
-      const accountsRes = await fetch(`${PIERRE_API_BASE}/get-accounts`, {
+      const accountsRes = await fetch(`${PIERRE_API_BASE}/tools/api/get-accounts`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${apiKey}`,
@@ -205,7 +205,7 @@ export const syncPierreData: RequestHandler = async (req, res) => {
       params.append('endDate', endDate.toISOString().split('T')[0]);
       params.append('format', 'raw');
 
-      const transRes = await fetch(`${PIERRE_API_BASE}/get-transactions?${params.toString()}`, {
+      const transRes = await fetch(`${PIERRE_API_BASE}/tools/api/get-transactions?${params.toString()}`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${apiKey}`,
@@ -225,7 +225,7 @@ export const syncPierreData: RequestHandler = async (req, res) => {
 
     // Fetch installments
     try {
-      const installRes = await fetch(`${PIERRE_API_BASE}/get-installments`, {
+      const installRes = await fetch(`${PIERRE_API_BASE}/tools/api/get-installments`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${apiKey}`,
