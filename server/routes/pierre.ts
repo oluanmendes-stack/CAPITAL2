@@ -129,6 +129,40 @@ export const getPierreTransactions: RequestHandler = async (req, res) => {
   }
 };
 
+export const getPierreBalance: RequestHandler = async (req, res) => {
+  try {
+    const apiKey = process.env.VITE_PIERRE_API_KEY;
+    if (!apiKey) {
+      return res.status(500).json({ error: 'Pierre API key not configured' });
+    }
+
+    const response = await fetch(`${PIERRE_API_BASE}/tools/api/get-balance`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      return res.status(response.status).json({
+        error: 'Failed to fetch balance',
+        details: errorData
+      });
+    }
+
+    const data = await response.json();
+    res.json(data);
+  } catch (error) {
+    console.error('Error fetching Pierre balance:', error);
+    res.status(500).json({
+      error: 'Failed to fetch balance',
+      message: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+};
+
 export const getPierreInstallments: RequestHandler = async (req, res) => {
   try {
     const apiKey = process.env.VITE_PIERRE_API_KEY;

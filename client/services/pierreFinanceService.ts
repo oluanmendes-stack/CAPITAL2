@@ -102,23 +102,69 @@ class PierreFinanceService {
   }
 
   async getBalances(): Promise<PierreBalance[]> {
-    const accounts = await this.getAccounts();
-    return accounts.map(account => {
-      const balance = account.balance ?? 0;
-      return {
-        accountId: account.id,
-        accountName: account.name,
-        accountType: account.type,
-        balance: balance,
-        availableBalance: balance,
-        currencyCode: account.currency,
-        lastUpdate: account.lastUpdate,
-        bankName: account.provider
-      };
+    const url = this.useServerProxy ? '/api/pierre/balance' : `${PIERRE_API_BASE}/tools/api/get-balance`;
+    const headers = this.useServerProxy ? this.getHeaders() : {
+      'Authorization': `Bearer ${this.apiKey}`,
+      'Content-Type': 'application/json'
+    };
+
+    const response = await fetch(url, {
+      method: 'GET',
+      headers
     });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new Error(
+        `Failed to fetch balances from Pierre: ${error.error || response.statusText}`
+      );
+    }
+
+    const data = await response.json();
+
+    if (!data.success) {
+      throw new Error('Pierre API returned unsuccessful response');
+    }
+
+    // Map accounts from balance response
+    return (data.data.accounts || []).map((account: any) => ({
+      accountId: account.id || account.accountId,
+      accountName: account.name || account.accountName,
+      accountType: account.type || 'checking',
+      balance: account.balance || 0,
+      availableBalance: account.availableBalance || account.balance || 0,
+      currencyCode: account.currencyCode || 'BRL',
+      lastUpdate: account.lastUpdate || new Date().toISOString(),
+      bankName: account.provider || account.bankName || ''
+    }));
   }
 
   async getConsolidatedBalance(): Promise<PierreConsolidatedBalance> {
+    const url = this.useServerProxy ? '/api/pierre/balance' : `${PIERRE_API_BASE}/tools/api/get-balance`;
+    const headers = this.useServerProxy ? this.getHeaders() : {
+      'Authorization': `Bearer ${this.apiKey}`,
+      'Content-Type': 'application/json'
+    };
+
+    const response = await fetch(url, {
+      method: 'GET',
+      headers
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new Error(
+        `Failed to fetch consolidated balance from Pierre: ${error.error || response.statusText}`
+      );
+    }
+
+    const data = await response.json();
+
+    if (!data.success) {
+      throw new Error('Pierre API returned unsuccessful response');
+    }
+
+    const balanceData = data.data;
     const balances = await this.getBalances();
 
     const balancesByType = {
@@ -129,30 +175,28 @@ class PierreFinanceService {
     };
 
     const balancesByProvider: Record<string, number> = {};
-    let totalBalance = 0;
 
     balances.forEach(balance => {
       const amount = balance.balance || 0;
-      totalBalance += amount;
-      balancesByType[balance.accountType] = (balancesByType[balance.accountType] || 0) + amount;
-    });
+      const accountType = balance.accountType as keyof typeof balancesByType;
+      if (accountType in balancesByType) {
+        balancesByType[accountType] += amount;
+      }
 
-    const accounts = await this.getAccounts();
-    accounts.forEach(account => {
-      const provider = account.provider;
+      const provider = balance.bankName || 'unknown';
       if (!balancesByProvider[provider]) {
         balancesByProvider[provider] = 0;
       }
-      balancesByProvider[provider] += account.balance;
+      balancesByProvider[provider] += amount;
     });
 
     return {
-      totalBalance,
-      totalAvailableBalance: totalBalance,
+      totalBalance: balanceData.total_balance || 0,
+      totalAvailableBalance: balanceData.total_balance || 0,
       currencyCode: 'BRL',
       balancesByType,
       balancesByProvider,
-      lastUpdate: new Date().toISOString()
+      lastUpdate: balanceData.timestamp || new Date().toISOString()
     };
   }
 
