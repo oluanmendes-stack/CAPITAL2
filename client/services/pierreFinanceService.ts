@@ -103,15 +103,19 @@ class PierreFinanceService {
 
   async getBalances(): Promise<PierreBalance[]> {
     const accounts = await this.getAccounts();
-    return accounts.map(account => ({
-      accountId: account.id,
-      accountName: account.name,
-      accountType: account.type,
-      balance: account.balance,
-      availableBalance: account.balance,
-      currencyCode: account.currency,
-      lastUpdate: account.lastUpdate
-    }));
+    return accounts.map(account => {
+      const balance = account.balance ?? 0;
+      return {
+        accountId: account.id,
+        accountName: account.name,
+        accountType: account.type,
+        balance: balance,
+        availableBalance: balance,
+        currencyCode: account.currency,
+        lastUpdate: account.lastUpdate,
+        bankName: account.provider
+      };
+    });
   }
 
   async getConsolidatedBalance(): Promise<PierreConsolidatedBalance> {

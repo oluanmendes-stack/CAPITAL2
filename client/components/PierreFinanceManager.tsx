@@ -232,7 +232,12 @@ export default function PierreFinanceManager({ open, onOpenChange }: PierreFinan
                                 ) : (
                                   <Wallet className="h-5 w-5 text-blue-600" />
                                 )}
-                                <CardTitle className="text-base">{balance.accountName}</CardTitle>
+                                <div className="flex-1">
+                                  <CardTitle className="text-base">{balance.accountName}</CardTitle>
+                                  {balance.bankName && (
+                                    <p className="text-xs text-gray-500 capitalize">{balance.bankName}</p>
+                                  )}
+                                </div>
                               </div>
                               <Badge variant="outline" className="capitalize">
                                 {balance.accountType === 'credit_card' ? 'Cartão' : balance.accountType === 'checking' ? 'Corrente' : 'Poupança'}
@@ -242,8 +247,8 @@ export default function PierreFinanceManager({ open, onOpenChange }: PierreFinan
                           <CardContent className="space-y-2">
                             <div>
                               <p className="text-sm text-gray-600">Saldo</p>
-                              <p className={`text-2xl font-bold ${balance.balance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                {formatCurrency(balance.balance)}
+                              <p className={`text-2xl font-bold ${balance.balance != null && balance.balance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                {balance.balance != null ? formatCurrency(balance.balance) : 'N/A'}
                               </p>
                             </div>
                             {balance.availableBalance !== undefined && (
@@ -367,7 +372,7 @@ export default function PierreFinanceManager({ open, onOpenChange }: PierreFinan
                               </div>
                             ))}
                             {purchase.installments.length > 6 && (
-                              <p className="text-xs text-gray-500 p-2">
+                              <p key={`remaining_${purchaseIdx}`} className="text-xs text-gray-500 p-2">
                                 +{purchase.installments.length - 6} parcelas...
                               </p>
                             )}

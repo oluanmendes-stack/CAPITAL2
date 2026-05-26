@@ -156,6 +156,41 @@ export function useOpenFinance() {
 
             importedCount++;
           });
+
+          // Buscar e importar parcelas como transações
+          try {
+            const installmentsResponse = await pierreFinanceService.getInstallments();
+            if (installmentsResponse?.data?.purchases) {
+              installmentsResponse.data.purchases.forEach(purchase => {
+                purchase.installments.forEach(installment => {
+                  const category = mapOpenFinanceCategory(installment.description || 'Parcela', installment.description);
+                  const categoryInfo = categories.find(cat => cat.id === category) ||
+                                      DEFAULT_CATEGORIES.find(cat => cat.id === category);
+
+                  addTransaction({
+                    type: 'despesa',
+                    category,
+                    categoryName: categoryInfo?.name,
+                    description: `${installment.description} (${installment.installmentNumber}/${installment.totalInstallments})`,
+                    amount: installment.amount,
+                    date: installment.dueDate,
+                    source: 'open-finance',
+                    sourceDetails: {
+                      bank: getProvider(provider)?.name,
+                      account: 'Parcelas',
+                      fileName: `open-finance-${provider}`
+                    },
+                    tags: ['open-finance', provider, 'parcela']
+                  });
+
+                  importedCount++;
+                });
+              });
+            }
+          } catch (installmentError) {
+            console.warn('Aviso ao buscar parcelas:', installmentError);
+            // Não falhar sincronização se parcelas não conseguirem ser importadas
+          }
         } catch (apiError) {
           console.error('Erro na API do Pierre:', apiError);
           throw apiError;

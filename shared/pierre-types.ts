@@ -8,6 +8,7 @@ export interface PierreBalance {
   availableBalance?: number;
   currencyCode: string;
   lastUpdate: string;
+  bankName?: string;
 }
 
 export interface PierreConsolidatedBalance {

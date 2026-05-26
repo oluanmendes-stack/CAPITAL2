@@ -53,7 +53,7 @@ export default function TransactionList({ showFilters = true }: TransactionListP
   const [exportModalOpen, setExportModalOpen] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [transactionToEdit, setTransactionToEdit] = useState<Transaction | null>(null);
-  const [selectedMonth, setSelectedMonth] = useState('all\');e(\'all\');l\');State(\'all\'); useState(\'all');
+  const [selectedMonth, setSelectedMonth] = useState('all');
 
   // Gerar lista de meses disponíveis
   const availableMonths = useMemo(() => {
