@@ -222,8 +222,8 @@ export default function PierreFinanceManager({ open, onOpenChange }: PierreFinan
                   <div>
                     <h3 className="font-semibold text-lg mb-3">Contas Conectadas</h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {balances.map((balance) => (
-                        <Card key={balance.accountId}>
+                      {balances.map((balance, idx) => (
+                        <Card key={balance.accountId || `balance-${idx}`}>
                           <CardHeader className="pb-3">
                             <div className="flex items-center justify-between">
                               <div className="flex items-center gap-2">
@@ -321,7 +321,7 @@ export default function PierreFinanceManager({ open, onOpenChange }: PierreFinan
 
                   {/* Detalhamento de Compras */}
                   {installmentsData.data.purchases.map((purchase, purchaseIdx) => (
-                    <Card key={`purchase_${purchaseIdx}`}>
+                    <Card key={purchase.id || `purchase_${purchaseIdx}`}>
                       <CardHeader>
                         <div className="flex items-start justify-between">
                           <div>
@@ -341,7 +341,7 @@ export default function PierreFinanceManager({ open, onOpenChange }: PierreFinan
                           <div className="space-y-2">
                             {purchase.installments.slice(0, 6).map((installment, idx) => (
                               <div
-                                key={`installment_${purchaseIdx}_${idx}`}
+                                key={installment.id || `installment_${purchaseIdx}_${installment.installmentNumber}`}
                                 className="flex items-center justify-between p-3 bg-gray-50 rounded text-sm"
                               >
                                 <div className="flex items-center gap-2">
