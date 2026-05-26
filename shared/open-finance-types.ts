@@ -1,6 +1,6 @@
 // Tipos para integração com Open Finance brasileiro
 
-export type OpenFinanceProvider = 'nubank' | 'inter' | 'recargapay';
+export type OpenFinanceProvider = 'nubank' | 'inter' | 'recargapay' | 'pierre';
 
 export interface OpenFinanceConnection {
   id: string;
@@ -97,6 +97,14 @@ export const OPEN_FINANCE_URLS = {
 
 // Configurações dos provedores
 export const OPEN_FINANCE_PROVIDERS = [
+  {
+    id: 'pierre' as const,
+    name: 'Pierre Finance',
+    description: 'Agregador de dados financeiros',
+    icon: '💰',
+    color: '#1E88E5',
+    permissions: ['ACCOUNTS_READ', 'TRANSACTIONS_READ', 'CREDIT_CARDS_READ'] as OpenFinancePermission[]
+  },
   {
     id: 'nubank' as const,
     name: 'Nubank',

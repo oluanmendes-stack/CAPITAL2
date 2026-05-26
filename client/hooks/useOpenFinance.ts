@@ -11,6 +11,7 @@ import {
 import { DEFAULT_CATEGORIES } from '@shared/financial-types';
 import { getOpenFinanceConfig } from '@shared/open-finance-config';
 import { openFinanceService } from '../services/openFinanceService';
+import { pierreFinanceService } from '../services/pierreFinanceService';
 
 export function useOpenFinance() {
   const { addTransaction, categories } = useFinancial();
@@ -24,13 +25,37 @@ export function useOpenFinance() {
   const isProduction = config.production;
 
   // Conectar com provedor Open Finance
-  const connectProvider = useCallback(async (provider: OpenFinanceProvider): Promise<boolean> => {
+  const connectProvider = useCallback(async (provider: OpenFinanceProvider): Promise<OpenFinanceConnection | null> => {
     setIsConnecting(true);
 
     try {
       const providerInfo = getProvider(provider);
       if (!providerInfo) {
         throw new Error('Provedor não encontrado');
+      }
+
+      if (provider === 'pierre') {
+        // Pierre é uma agregadora com autenticação via API key
+        // Para simplicidade em dev, vamos usar dados mock também
+        await new Promise(resolve => setTimeout(resolve, 2000));
+
+        const newConnection: OpenFinanceConnection = {
+          id: crypto.randomUUID(),
+          provider,
+          providerName: providerInfo.name,
+          isConnected: true,
+          lastSync: new Date().toISOString(),
+          accessToken: `pierre_key_${Date.now()}`,
+          permissions: providerInfo.permissions,
+          status: 'connected'
+        };
+
+        setConnections(prev => [...prev.filter(c => c.provider !== provider), newConnection]);
+
+        const mockAccounts = generateMockAccounts(provider, newConnection.id);
+        setAccounts(prev => [...prev.filter(a => a.provider !== provider), ...mockAccounts]);
+
+        return newConnection;
       }
 
       if (isProduction) {
@@ -46,7 +71,7 @@ export function useOpenFinance() {
 
         // Redirecionar para autorização
         window.location.href = authResponse.authorizationUrl;
-        return true;
+        return null;
       } else {
         // Desenvolvimento: usar dados simulados
         await new Promise(resolve => setTimeout(resolve, 2000));
@@ -69,22 +94,22 @@ export function useOpenFinance() {
         const mockAccounts = generateMockAccounts(provider, newConnection.id);
         setAccounts(prev => [...prev.filter(a => a.provider !== provider), ...mockAccounts]);
 
-        return true;
+        return newConnection;
       }
     } catch (error) {
       console.error('Erro ao conectar provedor:', error);
-      return false;
+      return null;
     } finally {
       setIsConnecting(false);
     }
   }, [isProduction]);
 
   // Sincronizar dados do provedor
-  const syncProvider = useCallback(async (provider: OpenFinanceProvider): Promise<OpenFinanceSyncResult> => {
+  const syncProvider = useCallback(async (provider: OpenFinanceProvider, providedConnection?: OpenFinanceConnection): Promise<OpenFinanceSyncResult> => {
     setIsSyncing(true);
 
     try {
-      const connection = connections.find(c => c.provider === provider);
+      const connection = providedConnection || connections.find(c => c.provider === provider);
       if (!connection || !connection.isConnected) {
         throw new Error('Provedor não conectado');
       }
@@ -92,7 +117,50 @@ export function useOpenFinance() {
       let importedCount = 0;
       let accountsUpdated = 0;
 
-      if (isProduction && connection.accessToken) {
+      if (provider === 'pierre' && connection.accessToken) {
+        // Pierre: usar serviço específico
+        try {
+          pierreFinanceService.setApiKey(connection.accessToken);
+
+          // Buscar contas
+          const fetchedAccounts = await pierreFinanceService.getAccounts();
+          setAccounts(prev => [...prev.filter(a => a.provider !== provider), ...fetchedAccounts]);
+          accountsUpdated = fetchedAccounts.length;
+
+          // Buscar transações dos últimos 90 dias
+          const endDate = new Date().toISOString().split('T')[0];
+          const startDate = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+
+          const transactions = await pierreFinanceService.getTransactions(startDate, endDate);
+
+          transactions.forEach(transaction => {
+            const category = mapOpenFinanceCategory(transaction.description, transaction.merchantName);
+            const categoryInfo = categories.find(cat => cat.id === category) ||
+                                DEFAULT_CATEGORIES.find(cat => cat.id === category);
+
+            addTransaction({
+              type: transaction.type === 'credit' ? 'receita' : 'despesa',
+              category,
+              categoryName: categoryInfo?.name,
+              description: transaction.description,
+              amount: transaction.amount,
+              date: transaction.date,
+              source: 'open-finance',
+              sourceDetails: {
+                bank: getProvider(provider)?.name,
+                account: transaction.accountId,
+                fileName: `open-finance-${provider}`
+              },
+              tags: ['open-finance', provider]
+            });
+
+            importedCount++;
+          });
+        } catch (apiError) {
+          console.error('Erro na API do Pierre:', apiError);
+          throw apiError;
+        }
+      } else if (isProduction && connection.accessToken) {
         // Produção: buscar dados reais
         try {
           // Verificar se token não expirou
@@ -299,6 +367,20 @@ export function useOpenFinance() {
 // Gerar contas mock para demonstração
 function generateMockAccounts(provider: OpenFinanceProvider, connectionId: string): OpenFinanceAccount[] {
   const baseAccounts = {
+    pierre: [
+      {
+        type: 'checking' as const,
+        name: 'Conta Agregada - Banco 1',
+        number: '**** 7890',
+        balance: 3200.50
+      },
+      {
+        type: 'credit_card' as const,
+        name: 'Cartão Agregado',
+        number: '**** 1234',
+        balance: -1500.00
+      }
+    ],
     nubank: [
       {
         type: 'checking' as const,
@@ -349,6 +431,14 @@ function generateMockAccounts(provider: OpenFinanceProvider, connectionId: strin
 // Gerar transações mock para demonstração
 function generateMockTransactions(provider: OpenFinanceProvider): OpenFinanceTransaction[] {
   const mockData = {
+    pierre: [
+      { description: 'Salário depositado', amount: -3000.00, type: 'credit' as const, merchantName: 'Employer' },
+      { description: 'Uber', amount: 35.50, type: 'debit' as const, merchantName: 'Uber' },
+      { description: 'Supermercado Carrefour', amount: 125.75, type: 'debit' as const, merchantName: 'Carrefour' },
+      { description: 'Netflix', amount: 29.90, type: 'debit' as const, merchantName: 'Netflix' },
+      { description: 'Farmácia', amount: 65.30, type: 'debit' as const, merchantName: 'Drogaria SP' },
+      { description: 'Pix Recebido - Amigo', amount: -150.00, type: 'credit' as const, merchantName: 'PIX' }
+    ],
     nubank: [
       { description: 'Pagamento recebido - João Silva', amount: -500.00, type: 'credit' as const, merchantName: 'PIX' },
       { description: 'Uber', amount: 25.50, type: 'debit' as const, merchantName: 'Uber' },

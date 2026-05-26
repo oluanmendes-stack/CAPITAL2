@@ -53,18 +53,18 @@ export default function OpenFinanceManager({ children, open, onOpenChange }: Ope
 
   const handleConnect = async (provider: OpenFinanceProvider) => {
     setSelectedProvider(provider);
-    const success = await connectProvider(provider);
-    
-    if (success) {
-      // Sincronizar automaticamente após conectar
+    const connection = await connectProvider(provider);
+
+    if (connection) {
+      // Sincronizar automaticamente após conectar com a conexão recém-criada
       try {
-        const result = await syncProvider(provider);
+        const result = await syncProvider(provider, connection);
         setSyncResults(prev => ({ ...prev, [provider]: result }));
       } catch (error) {
         console.error('Erro na sincronização inicial:', error);
       }
     }
-    
+
     setSelectedProvider(null);
   };
 

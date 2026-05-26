@@ -3,6 +3,7 @@ import express from "express";
 import cors from "cors";
 import { handleDemo } from "./routes/demo";
 import { handleQuote } from "./routes/quote";
+import { getPierreAccounts, getPierreTransactions } from "./routes/pierre";
 
 export function createServer() {
   const app = express();
@@ -20,6 +21,10 @@ export function createServer() {
 
   app.get("/api/demo", handleDemo);
   app.get("/api/quote/:type", handleQuote);
+
+  // Pierre Finance API routes
+  app.get("/api/pierre/accounts", getPierreAccounts);
+  app.get("/api/pierre/transactions", getPierreTransactions);
 
   return app;
 }
