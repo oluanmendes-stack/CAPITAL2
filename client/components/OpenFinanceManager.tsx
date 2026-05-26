@@ -7,7 +7,7 @@ import { Badge } from './ui/badge';
 import { Alert, AlertDescription } from './ui/alert';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
-import BelvoManager from './BelvoManager';
+import PierreFinanceManager from './PierreFinanceManager';
 import {
   Building2,
   CheckCircle,
@@ -49,7 +49,7 @@ export default function OpenFinanceManager({ children, open, onOpenChange }: Ope
   const [selectedProvider, setSelectedProvider] = useState<OpenFinanceProvider | null>(null);
   const [syncResults, setSyncResults] = useState<Record<string, any>>({});
   const [activeTab, setActiveTab] = useState('traditional');
-  const [belvoModalOpen, setBelvoModalOpen] = useState(false);
+  const [pierreModalOpen, setPierreModalOpen] = useState(false);
 
   const handleConnect = async (provider: OpenFinanceProvider) => {
     setSelectedProvider(provider);
@@ -102,9 +102,9 @@ export default function OpenFinanceManager({ children, open, onOpenChange }: Ope
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="traditional">Open Finance Tradicional</TabsTrigger>
-            <TabsTrigger value="belvo">
+            <TabsTrigger value="pierre">
               <Zap className="h-4 w-4 mr-2" />
-              Belvo API
+              Pierre Finance
             </TabsTrigger>
           </TabsList>
 
@@ -328,27 +328,27 @@ export default function OpenFinanceManager({ children, open, onOpenChange }: Ope
           </div>
           </TabsContent>
 
-          <TabsContent value="belvo" className="space-y-6">
+          <TabsContent value="pierre" className="space-y-6">
             <Alert>
               <Zap className="h-4 w-4" />
               <AlertDescription>
-                <strong>Belvo:</strong> API robusta que oferece conectividade direta com bancos
-                brasileiros como Nubank, Inter, Itaú e outros. Mais estável e confiável
-                que o Open Finance tradicional.
+                <strong>Pierre Finance:</strong> Agregador que conecta múltiplos bancos brasileiros
+                como Nubank, Recarga Pay, Inter, Itaú e outros. Oferece acesso a saldos consolidados,
+                transações completas e gerenciamento de parcelas.
               </AlertDescription>
             </Alert>
 
             <Card>
               <CardHeader>
-                <CardTitle>Gerenciar Conexões Belvo</CardTitle>
+                <CardTitle>Gerenciar Contas Pierre Finance</CardTitle>
                 <CardDescription>
-                  Configure suas conexões bancárias através da API Belvo
+                  Visualize e sincronize suas contas, saldos, transações e parcelas
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <Button onClick={() => setBelvoModalOpen(true)} className="w-full">
+                <Button onClick={() => setPierreModalOpen(true)} className="w-full">
                   <Zap className="h-4 w-4 mr-2" />
-                  Abrir Gerenciador Belvo
+                  Abrir Gerenciador Pierre
                 </Button>
               </CardContent>
             </Card>
@@ -356,9 +356,9 @@ export default function OpenFinanceManager({ children, open, onOpenChange }: Ope
         </Tabs>
       </DialogContent>
 
-      <BelvoManager
-        open={belvoModalOpen}
-        onOpenChange={setBelvoModalOpen}
+      <PierreFinanceManager
+        open={pierreModalOpen}
+        onOpenChange={setPierreModalOpen}
       />
     </Dialog>
   );

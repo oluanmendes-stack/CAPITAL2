@@ -1,67 +1,16 @@
 import { OpenFinanceAccount, OpenFinanceTransaction } from '@shared/open-finance-types';
+import {
+  PierreAccountsResponse,
+  PierreTransactionsResponse,
+  PierreBalance,
+  PierreConsolidatedBalance,
+  PierreInstallmentSchedule,
+  PierreSyncResult,
+  PierreAccount,
+  PierreTransaction
+} from '@shared/pierre-types';
 
 const PIERRE_API_BASE = 'https://www.pierre.finance/tools/api';
-
-interface PierreAccount {
-  accountId: string;
-  providerCode: string;
-  accountName: string;
-  accountType: string;
-  accountSubtype: string;
-  accountBalance: number;
-  accountCurrencyCode: string;
-  accountMarketingName: string;
-  bankData?: {
-    transferNumber?: string;
-    closingBalance?: number;
-    automaticallyInvestedBalance?: number;
-  };
-  creditData?: {
-    brand?: string;
-    level?: string;
-    status?: string;
-    creditLimit?: number;
-    balanceDueDate?: string;
-    minimumPayment?: number;
-    balanceCloseDate?: string;
-    availableCreditLimit?: number;
-    balanceForeignCurrency?: number | null;
-  };
-}
-
-interface PierreTransaction {
-  id: string;
-  description: string;
-  category: string | null;
-  currency_code: string;
-  amount: number;
-  balance: number | null;
-  date: string;
-  type: 'DEBIT' | 'CREDIT';
-  status: 'POSTED' | 'PENDING';
-  account_name: string;
-  account_type: string;
-  account_subtype: string;
-  account_marketing_name: string;
-}
-
-interface PierreAccountsResponse {
-  success: boolean;
-  data: PierreAccount[];
-  count: number;
-  timestamp: string;
-}
-
-interface PierreTransactionsResponse {
-  success: boolean;
-  data: PierreTransaction[];
-  count: number;
-  filters: Record<string, unknown>;
-  timestamp: string;
-  totalBeforeFilter?: number | null;
-  clientMessageUsed?: string | null;
-  message?: string;
-}
 
 class PierreFinanceService {
   private apiKey: string;
@@ -151,6 +100,107 @@ class PierreFinanceService {
     }
 
     return data.data.map(transaction => this.mapPierreTransaction(transaction));
+  }
+
+  async getBalances(): Promise<PierreBalance[]> {
+    const accounts = await this.getAccounts();
+    return accounts.map(account => ({
+      accountId: account.id,
+      accountName: account.name,
+      accountType: account.type,
+      balance: account.balance,
+      availableBalance: account.balance,
+      currencyCode: account.currency,
+      lastUpdate: account.lastUpdate
+    }));
+  }
+
+  async getConsolidatedBalance(): Promise<PierreConsolidatedBalance> {
+    const balances = await this.getBalances();
+
+    const balancesByType = {
+      checking: 0,
+      savings: 0,
+      credit_card: 0,
+      investment: 0
+    };
+
+    const balancesByProvider: Record<string, number> = {};
+    let totalBalance = 0;
+
+    balances.forEach(balance => {
+      const amount = balance.balance || 0;
+      totalBalance += amount;
+      balancesByType[balance.accountType] = (balancesByType[balance.accountType] || 0) + amount;
+    });
+
+    const accounts = await this.getAccounts();
+    accounts.forEach(account => {
+      const provider = account.provider;
+      if (!balancesByProvider[provider]) {
+        balancesByProvider[provider] = 0;
+      }
+      balancesByProvider[provider] += account.balance;
+    });
+
+    return {
+      totalBalance,
+      totalAvailableBalance: totalBalance,
+      currencyCode: 'BRL',
+      balancesByType,
+      balancesByProvider,
+      lastUpdate: new Date().toISOString()
+    };
+  }
+
+  async getInstallments(): Promise<PierreInstallmentSchedule[]> {
+    const url = this.useServerProxy
+      ? '/api/pierre/installments'
+      : `${PIERRE_API_BASE}/get-installments`;
+
+    const headers = this.useServerProxy ? this.getHeaders() : {
+      'Authorization': `Bearer ${this.apiKey}`,
+      'Content-Type': 'application/json'
+    };
+
+    const response = await fetch(url, {
+      method: 'GET',
+      headers
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new Error(
+        `Failed to fetch installments from Pierre: ${error.error || response.statusText}`
+      );
+    }
+
+    const data = await response.json();
+    return data.data || [];
+  }
+
+  async syncData(): Promise<PierreSyncResult> {
+    try {
+      const accounts = await this.getAccounts();
+      const transactions = await this.getTransactions();
+      const installments = await this.getInstallments();
+
+      return {
+        timestamp: new Date().toISOString(),
+        accountsCount: accounts.length,
+        transactionsImported: transactions.length,
+        installmentsFound: installments.length,
+        errors: []
+      };
+    } catch (error) {
+      return {
+        timestamp: new Date().toISOString(),
+        accountsCount: 0,
+        transactionsImported: 0,
+        installmentsFound: 0,
+        errors: [error instanceof Error ? error.message : 'Unknown error occurred']
+      };
+    }
   }
 
   private mapPierreAccount(account: PierreAccount): OpenFinanceAccount {
