@@ -6,6 +6,7 @@ import { useChartData } from '../hooks/useChartData';
 import { useOpenFinance } from '../hooks/useOpenFinance';
 import { useProductionMode } from '../hooks/useProductionMode';
 import { useGoals } from '../contexts/GoalsContext';
+import { usePierreBalance } from '../hooks/usePierreBalance';
 import { loadSampleData } from '../utils/sampleData';
 import { createTestCSVFile, createTestNubankCSVFile, createTestRecargaPayCSVFile } from '../utils/testImportData';
 import { useImport } from '../hooks/useImport';
@@ -149,6 +150,7 @@ export default function CapitalDashboard() {
   const { isProductionMode, toggleProductionMode, isLoading: isLoadingProductionMode } = useProductionMode();
   const { summary: goalsSummary } = useGoals();
   const { user, logout } = useAuth();
+  const { consolidatedBalance } = usePierreBalance();
   const [activeTab, setActiveTab] = useState('overview');
   const [transactionModalOpen, setTransactionModalOpen] = useState(false);
   const [receitaModalOpen, setReceitaModalOpen] = useState(false);
@@ -423,6 +425,14 @@ export default function CapitalDashboard() {
                 icon={<Wallet />}
                 trend={summary.availableBalanceTotal + fgtsBalance > 0 ? 'up' : summary.availableBalanceTotal + fgtsBalance < 0 ? 'down' : 'neutral'}
               />
+              {consolidatedBalance && (
+                <DashboardCard
+                  title="Saldo Pierre"
+                  value={formatCurrency(consolidatedBalance.totalBalance)}
+                  icon={<Building2 />}
+                  trend={consolidatedBalance.totalBalance > 0 ? 'up' : consolidatedBalance.totalBalance < 0 ? 'down' : 'neutral'}
+                />
+              )}
             </div>
 
             {/* Indicador de Filtros Ativos */}
