@@ -24,34 +24,51 @@ export interface PierreConsolidatedBalance {
   lastUpdate: string;
 }
 
+// API Pierre - Installments Response
 export interface PierreInstallment {
-  id: string;
   description: string;
   amount: number;
-  currency: string;
   installmentNumber: number;
   totalInstallments: number;
   dueDate: string;
-  status: 'pending' | 'paid' | 'overdue' | 'cancelled';
-  originalTransaction: {
-    id: string;
-    description: string;
-    amount: number;
-    date: string;
-  };
-  accountId: string;
-  accountName: string;
+  category: string | null;
+  status: 'POSTED' | 'PENDING' | 'OVERDUE' | 'CANCELLED';
 }
 
-export interface PierreInstallmentSchedule {
-  transactionId: string;
-  description: string;
+export interface PierreInstallmentPurchase {
+  purchaseDate: string;
   totalAmount: number;
-  installmentCount: number;
-  currency: string;
   installments: PierreInstallment[];
-  nextPaymentDate?: string;
-  completionDate?: string;
+}
+
+export interface PierreInstallmentSummary {
+  totalAmount: number;
+  totalInstallments: number;
+  totalPurchases: number;
+  installmentDistribution: Array<{
+    totalInstallments: number;
+    count: number;
+    totalAmount: number;
+  }>;
+}
+
+export interface PierreInstallmentsResponse {
+  success: boolean;
+  data: {
+    summary: PierreInstallmentSummary;
+    purchases: PierreInstallmentPurchase[];
+    dateRange: {
+      startDate: string;
+      endDate: string;
+    };
+    timestamp: string;
+  };
+  summary: PierreInstallmentSummary;
+  dateRange: {
+    startDate: string;
+    endDate: string;
+  };
+  timestamp: string;
 }
 
 export interface PierreAccount {

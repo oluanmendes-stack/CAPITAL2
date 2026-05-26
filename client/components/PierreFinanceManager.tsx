@@ -3,7 +3,7 @@ import { pierreFinanceService } from '../services/pierreFinanceService';
 import {
   PierreConsolidatedBalance,
   PierreBalance,
-  PierreInstallmentSchedule,
+  PierreInstallmentsResponse,
   PierreSyncResult
 } from '@shared/pierre-types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
@@ -36,7 +36,7 @@ export default function PierreFinanceManager({ open, onOpenChange }: PierreFinan
 
   const [balances, setBalances] = useState<PierreBalance[]>([]);
   const [consolidatedBalance, setConsolidatedBalance] = useState<PierreConsolidatedBalance | null>(null);
-  const [installments, setInstallments] = useState<PierreInstallmentSchedule[]>([]);
+  const [installmentsData, setInstallmentsData] = useState<PierreInstallmentsResponse | null>(null);
   const [syncResult, setSyncResult] = useState<PierreSyncResult | null>(null);
   const [lastSync, setLastSync] = useState<string | null>(null);
 
@@ -50,7 +50,7 @@ export default function PierreFinanceManager({ open, onOpenChange }: PierreFinan
     setIsLoading(true);
     setError(null);
     try {
-      const [balancesData, consolidatedData, installmentsData] = await Promise.all([
+      const [balancesData, consolidatedData, installments] = await Promise.all([
         pierreFinanceService.getBalances(),
         pierreFinanceService.getConsolidatedBalance(),
         pierreFinanceService.getInstallments()
@@ -58,7 +58,7 @@ export default function PierreFinanceManager({ open, onOpenChange }: PierreFinan
 
       setBalances(balancesData);
       setConsolidatedBalance(consolidatedData);
-      setInstallments(installmentsData);
+      setInstallmentsData(installments);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro ao carregar dados');
     } finally {
@@ -277,63 +277,98 @@ export default function PierreFinanceManager({ open, onOpenChange }: PierreFinan
                 <div className="flex justify-center items-center p-8">
                   <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
                 </div>
-              ) : installments.length > 0 ? (
+              ) : installmentsData?.data?.purchases && installmentsData.data.purchases.length > 0 ? (
                 <div className="space-y-4">
-                  {installments.map((schedule) => (
-                    <Card key={schedule.transactionId}>
+                  {/* Resumo de Parcelas */}
+                  <Card className="border-blue-200 bg-blue-50">
+                    <CardHeader>
+                      <CardTitle className="text-lg">Resumo de Parcelas</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div>
+                          <p className="text-xs text-gray-600">Total de Compras</p>
+                          <p className="text-2xl font-bold text-blue-600">
+                            {installmentsData.data.summary.totalPurchases}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-600">Total de Parcelas</p>
+                          <p className="text-2xl font-bold text-blue-600">
+                            {installmentsData.data.summary.totalInstallments}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-600">Valor Total</p>
+                          <p className="text-2xl font-bold text-blue-600">
+                            {formatCurrency(installmentsData.data.summary.totalAmount)}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-600">Atualizado em</p>
+                          <p className="text-sm font-semibold">
+                            {formatDate(installmentsData.data.timestamp)}
+                          </p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Detalhamento de Compras */}
+                  {installmentsData.data.purchases.map((purchase, purchaseIdx) => (
+                    <Card key={`purchase_${purchaseIdx}`}>
                       <CardHeader>
                         <div className="flex items-start justify-between">
                           <div>
-                            <CardTitle className="text-base">{schedule.description}</CardTitle>
+                            <CardTitle className="text-base">
+                              Compra de {formatCurrency(purchase.totalAmount)}
+                            </CardTitle>
                             <CardDescription>
-                              {schedule.installmentCount} parcelas de {formatCurrency(schedule.totalAmount / schedule.installmentCount)}
+                              {purchase.installments.length} parcelas
                             </CardDescription>
                           </div>
-                          <Badge variant="outline">{schedule.installmentCount}x</Badge>
+                          <Badge variant="outline">{purchase.installments.length}x</Badge>
                         </div>
                       </CardHeader>
                       <CardContent className="space-y-4">
-                        <div className="grid grid-cols-3 gap-4">
-                          <div>
-                            <p className="text-xs text-gray-600">Valor Total</p>
-                            <p className="text-lg font-bold">{formatCurrency(schedule.totalAmount)}</p>
-                          </div>
-                          <div>
-                            <p className="text-xs text-gray-600">Próximo Pagamento</p>
-                            <p className="text-lg font-bold">
-                              {schedule.nextPaymentDate ? formatDate(schedule.nextPaymentDate) : 'N/A'}
-                            </p>
-                          </div>
-                          <div>
-                            <p className="text-xs text-gray-600">Conclusão</p>
-                            <p className="text-lg font-bold">
-                              {schedule.completionDate ? formatDate(schedule.completionDate) : 'N/A'}
-                            </p>
-                          </div>
-                        </div>
-
                         <div>
-                          <p className="text-sm font-medium mb-2">Cronograma:</p>
+                          <p className="text-sm font-medium mb-2">Cronograma de Pagamentos:</p>
                           <div className="space-y-2">
-                            {schedule.installments.slice(0, 5).map((installment) => (
-                              <div key={installment.id} className="flex items-center justify-between p-2 bg-gray-50 rounded text-sm">
+                            {purchase.installments.slice(0, 6).map((installment, idx) => (
+                              <div
+                                key={`installment_${purchaseIdx}_${idx}`}
+                                className="flex items-center justify-between p-3 bg-gray-50 rounded text-sm"
+                              >
                                 <div className="flex items-center gap-2">
-                                  {installment.status === 'paid' && <CheckCircle className="h-4 w-4 text-green-600" />}
-                                  {installment.status === 'pending' && <Clock className="h-4 w-4 text-blue-600" />}
-                                  {installment.status === 'overdue' && <AlertCircle className="h-4 w-4 text-red-600" />}
-                                  <span>
-                                    Parcela {installment.installmentNumber}/{schedule.installmentCount}
-                                  </span>
+                                  {installment.status === 'POSTED' && (
+                                    <CheckCircle className="h-4 w-4 text-green-600" />
+                                  )}
+                                  {installment.status === 'PENDING' && (
+                                    <Clock className="h-4 w-4 text-blue-600" />
+                                  )}
+                                  {installment.status === 'OVERDUE' && (
+                                    <AlertCircle className="h-4 w-4 text-red-600" />
+                                  )}
+                                  <div>
+                                    <p className="font-medium">
+                                      Parcela {installment.installmentNumber}/{installment.totalInstallments}
+                                    </p>
+                                    {installment.description && (
+                                      <p className="text-xs text-gray-600">{installment.description}</p>
+                                    )}
+                                  </div>
                                 </div>
-                                <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-3">
                                   <span className="font-semibold">{formatCurrency(installment.amount)}</span>
-                                  <span className="text-gray-600">{formatDate(installment.dueDate)}</span>
+                                  <span className="text-gray-600 text-xs whitespace-nowrap">
+                                    {formatDate(installment.dueDate)}
+                                  </span>
                                 </div>
                               </div>
                             ))}
-                            {schedule.installments.length > 5 && (
+                            {purchase.installments.length > 6 && (
                               <p className="text-xs text-gray-500 p-2">
-                                +{schedule.installments.length - 5} parcelas...
+                                +{purchase.installments.length - 6} parcelas...
                               </p>
                             )}
                           </div>

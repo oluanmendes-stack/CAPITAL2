@@ -4,7 +4,6 @@ import {
   PierreTransactionsResponse,
   PierreBalance,
   PierreConsolidatedBalance,
-  PierreInstallmentSchedule,
   PierreSyncResult,
   PierreAccount,
   PierreTransaction
@@ -153,7 +152,7 @@ class PierreFinanceService {
     };
   }
 
-  async getInstallments(): Promise<PierreInstallmentSchedule[]> {
+  async getInstallments() {
     const url = this.useServerProxy
       ? '/api/pierre/installments'
       : `${PIERRE_API_BASE}/get-installments`;
@@ -176,20 +175,25 @@ class PierreFinanceService {
     }
 
     const data = await response.json();
-    return data.data || [];
+    if (!data.success) {
+      throw new Error('Pierre API returned unsuccessful response');
+    }
+    return data;
   }
 
   async syncData(): Promise<PierreSyncResult> {
     try {
       const accounts = await this.getAccounts();
       const transactions = await this.getTransactions();
-      const installments = await this.getInstallments();
+      const installmentsResponse = await this.getInstallments();
+
+      const installmentsCount = installmentsResponse?.data?.summary?.totalInstallments || 0;
 
       return {
         timestamp: new Date().toISOString(),
         accountsCount: accounts.length,
         transactionsImported: transactions.length,
-        installmentsFound: installments.length,
+        installmentsFound: installmentsCount,
         errors: []
       };
     } catch (error) {
