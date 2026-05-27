@@ -300,8 +300,9 @@ export default function CapitalDashboard() {
   const recentTransactions = getFilteredTransactions().slice(0, 5);
 
   const getSaldoTrend = () => {
-    if (summary.saldoMes > 0) return 'up';
-    if (summary.saldoMes < 0) return 'down';
+    const pierreSaldo = (summary.pierreReceitas || 0) - (summary.pierreDespesas || 0);
+    if (pierreSaldo > 0) return 'up';
+    if (pierreSaldo < 0) return 'down';
     return 'neutral';
   };
 
@@ -406,7 +407,7 @@ export default function CapitalDashboard() {
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-2 sm:gap-4">
               <DashboardCard
                 title="Saldo Mês Atual"
-                value={formatCurrency(summary.saldoMes)}
+                value={formatCurrency((summary.pierreReceitas || 0) - (summary.pierreDespesas || 0))}
                 icon={<Wallet />}
                 trend={getSaldoTrend()}
               />
@@ -418,13 +419,13 @@ export default function CapitalDashboard() {
               />
               <DashboardCard
                 title="Receitas do Mês"
-                value={formatCurrency(summary.monthlyReceitas)}
+                value={formatCurrency(summary.pierreReceitas || 0)}
                 icon={<TrendingUp />}
                 trend="up"
               />
               <DashboardCard
                 title="Despesas do Mês"
-                value={formatCurrency(summary.monthlyDespesas)}
+                value={formatCurrency(summary.pierreDespesas || 0)}
                 change={summary.variacaoMensal}
                 icon={<TrendingDown />}
                 trend={getVariacaoTrend()}
@@ -441,7 +442,7 @@ export default function CapitalDashboard() {
               />
               <DashboardCard
                 title="Transações"
-                value={(transactions.length + pierreTransactionCount).toString()}
+                value={pierreTransactionCount.toString()}
                 icon={<CreditCard />}
               />
               <DashboardCard

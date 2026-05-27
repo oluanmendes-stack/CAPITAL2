@@ -17,6 +17,9 @@ export function useFinancialSummary(): FinancialSummary & {
   totalWithFGTS: number;
   monthlyReceitas: number;
   monthlyDespesas: number;
+  pierreReceitas: number;
+  pierreDespesas: number;
+  pierreTransactionCount: number;
 } {
   const { summary: transactionSummary, transactions, getFilteredTransactions, fgtsBalance, filters } = useFinancial();
   const { summary: investmentSummary, getTotalAllocatedToGoals, investments } = useInvestments();
@@ -116,6 +119,15 @@ export function useFinancialSummary(): FinancialSummary & {
     const availableBalanceMonth = saldoMes - allocatedToGoals;
     const availableBalanceTotal = totalWithFGTS - allocatedToGoals;
 
+    // Pierre-only values for dashboard display
+    const pierreReceitas = filteredPierreTransactions
+      .filter(t => t.type === 'CREDIT')
+      .reduce((sum, t) => sum + t.amount, 0);
+
+    const pierreDespesas = filteredPierreTransactions
+      .filter(t => t.type === 'DEBIT')
+      .reduce((sum, t) => sum + t.amount, 0);
+
     return {
       ...transactionSummary,
       saldoAtual: saldoTotalComInvestimentos,
@@ -129,7 +141,10 @@ export function useFinancialSummary(): FinancialSummary & {
       fgtsBalance,
       totalWithFGTS,
       monthlyReceitas,
-      monthlyDespesas
+      monthlyDespesas,
+      pierreReceitas,
+      pierreDespesas,
+      pierceTransactionCount: filteredPierreTransactions.length
     };
   }, [transactionSummary, transactions, getFilteredTransactions, investmentSummary, getTotalAllocatedToGoals, investments, fgtsBalance, pierreTransactions, filters]);
 }
