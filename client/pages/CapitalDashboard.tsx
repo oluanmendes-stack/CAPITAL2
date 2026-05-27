@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useFinancial } from '../contexts/FinancialContext';
 import { useFinancialSummary } from '../hooks/useFinancialSummary';
 import { useAuth } from '../contexts/AuthContext';
@@ -10,7 +10,8 @@ import { usePierreBalance } from '../hooks/usePierreBalance';
 import { loadSampleData } from '../utils/sampleData';
 import { createTestCSVFile, createTestNubankCSVFile, createTestRecargaPayCSVFile } from '../utils/testImportData';
 import { useImport } from '../hooks/useImport';
-import { format } from 'date-fns';
+import { PierreTransactionsResponse } from '@shared/pierre-types';
+import { format, subMonths } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
@@ -30,7 +31,6 @@ import GoalsTab from '../components/GoalsTab';
 import GoalAllocationModal from '../components/GoalAllocationModal';
 import CategoryModal from '../components/CategoryModal';
 import BudgetDivision from '../components/BudgetDivision';
-import PierreTransactionsWindow from '../components/PierreTransactionsWindow';
 import ExpensePieChart from '../components/charts/ExpensePieChart';
 import MonthlyBarChart from '../components/charts/MonthlyBarChart';
 import TrendLineChart from '../components/charts/TrendLineChart';
@@ -167,6 +167,32 @@ export default function CapitalDashboard() {
   const [customStartDate, setCustomStartDate] = useState<Date | undefined>();
   const [customEndDate, setCustomEndDate] = useState<Date | undefined>();
   const [selectedMonth, setSelectedMonth] = useState<string>(''); // Para filtro de mês na visão geral
+  const [pierreTransactionCount, setPierreTransactionCount] = useState(0);
+
+  // Fetch Pierre transactions count
+  useEffect(() => {
+    const fetchPierreCount = async () => {
+      try {
+        const startDate = subMonths(new Date(), 3);
+        const params = new URLSearchParams();
+        params.append('startDate', format(startDate, 'yyyy-MM-dd'));
+        params.append('endDate', format(new Date(), 'yyyy-MM-dd'));
+        params.append('format', 'raw');
+
+        const response = await fetch(`/api/pierre/transactions?${params.toString()}`);
+        if (response.ok) {
+          const data: PierreTransactionsResponse = await response.json();
+          if (data.success) {
+            setPierreTransactionCount((data.data || []).length);
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching Pierre transaction count:', error);
+      }
+    };
+
+    fetchPierreCount();
+  }, []);
 
   const handleLoadSampleData = async () => {
     if (transactions.length > 0) {
@@ -271,8 +297,8 @@ export default function CapitalDashboard() {
   const recentTransactions = getFilteredTransactions().slice(0, 5);
 
   const getSaldoTrend = () => {
-    if (summary.saldoAtual > 0) return 'up';
-    if (summary.saldoAtual < 0) return 'down';
+    if (summary.availableBalanceMonth > 0) return 'up';
+    if (summary.availableBalanceMonth < 0) return 'down';
     return 'neutral';
   };
 
@@ -341,7 +367,7 @@ export default function CapitalDashboard() {
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4 sm:space-y-6">
-          <TabsList className="grid w-full grid-cols-8 h-auto">
+          <TabsList className="grid w-full grid-cols-7 h-auto">
             <TabsTrigger value="overview" className="text-xs sm:text-sm px-1 sm:px-3 py-2">
               <span className="hidden sm:inline">Visão Geral</span>
               <span className="sm:hidden">Geral</span>
@@ -349,10 +375,6 @@ export default function CapitalDashboard() {
             <TabsTrigger value="transactions" className="text-xs sm:text-sm px-1 sm:px-3 py-2">
               <span className="hidden sm:inline">Transações</span>
               <span className="sm:hidden">Trans.</span>
-            </TabsTrigger>
-            <TabsTrigger value="pierre" className="text-xs sm:text-sm px-1 sm:px-3 py-2">
-              <span className="hidden sm:inline">Pierre</span>
-              <span className="sm:hidden">Pierre</span>
             </TabsTrigger>
             <TabsTrigger value="budget" className="text-xs sm:text-sm px-1 sm:px-3 py-2">
               <span className="hidden sm:inline">Divisão Financeira</span>
@@ -393,13 +415,13 @@ export default function CapitalDashboard() {
               />
               <DashboardCard
                 title="Receitas do Mês"
-                value={formatCurrency(summary.totalReceitas)}
+                value={formatCurrency(summary.monthlyReceitas)}
                 icon={<TrendingUp />}
                 trend="up"
               />
               <DashboardCard
                 title="Despesas do Mês"
-                value={formatCurrency(summary.totalDespesas)}
+                value={formatCurrency(summary.monthlyDespesas)}
                 change={summary.variacaoMensal}
                 icon={<TrendingDown />}
                 trend={getVariacaoTrend()}
@@ -416,7 +438,7 @@ export default function CapitalDashboard() {
               />
               <DashboardCard
                 title="Transações"
-                value={transactions.length.toString()}
+                value={(transactions.length + pierreTransactionCount).toString()}
                 icon={<CreditCard />}
               />
               <DashboardCard
@@ -426,9 +448,9 @@ export default function CapitalDashboard() {
               />
               <DashboardCard
                 title="Total c/ FGTS"
-                value={formatCurrency(summary.availableBalanceTotal + fgtsBalance)}
+                value={formatCurrency(summary.totalWithFGTS)}
                 icon={<Wallet />}
-                trend={summary.availableBalanceTotal + fgtsBalance > 0 ? 'up' : summary.availableBalanceTotal + fgtsBalance < 0 ? 'down' : 'neutral'}
+                trend={summary.totalWithFGTS > 0 ? 'up' : summary.totalWithFGTS < 0 ? 'down' : 'neutral'}
               />
               {consolidatedBalance && (
                 <DashboardCard
@@ -855,10 +877,6 @@ export default function CapitalDashboard() {
 
           <TabsContent value="transactions">
             <TransactionList />
-          </TabsContent>
-
-          <TabsContent value="pierre">
-            <PierreTransactionsWindow open={true} />
           </TabsContent>
 
           <TabsContent value="budget">

@@ -1,7 +1,8 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useFinancial } from '../contexts/FinancialContext';
 import { useContextSync } from '../hooks/useContextSync';
 import { Transaction, TransactionType } from '@shared/financial-types';
+import { PierreTransaction, PierreTransactionsResponse } from '@shared/pierre-types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -20,9 +21,13 @@ import {
   Trash2,
   ChevronDown,
   Download,
-  ArrowUpDown
+  ArrowUpDown,
+  AlertCircle,
+  Loader2,
+  RefreshCw
 } from 'lucide-react';
-import { format } from 'date-fns';
+import { Alert, AlertDescription } from './ui/alert';
+import { format, subMonths } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '../lib/utils';
 
@@ -30,8 +35,21 @@ interface TransactionListProps {
   showFilters?: boolean;
 }
 
-type SortField = 'date' | 'amount' | 'category' | 'description';
+type SortField = 'date' | 'amount' | 'category' | 'description' | 'source';
 type SortDirection = 'asc' | 'desc';
+
+interface CombinedTransaction {
+  id: string;
+  type: 'receita' | 'despesa' | 'DEBIT' | 'CREDIT';
+  amount: number;
+  date: string;
+  description: string;
+  category?: string;
+  categoryName?: string;
+  source: 'manual' | 'import' | 'pierre';
+  status?: 'POSTED' | 'PENDING';
+  account_name?: string;
+}
 
 export default function TransactionList({ showFilters = true }: TransactionListProps) {
   const {
@@ -55,10 +73,75 @@ export default function TransactionList({ showFilters = true }: TransactionListP
   const [transactionToEdit, setTransactionToEdit] = useState<Transaction | null>(null);
   const [selectedMonth, setSelectedMonth] = useState('all');
 
+  // Pierre transactions
+  const [pierreTransactions, setPierreTransactions] = useState<PierreTransaction[]>([]);
+  const [pierreLoading, setPierreLoading] = useState(false);
+  const [pierreError, setPierreError] = useState<string | null>(null);
+  const [showPierreTransactions, setShowPierreTransactions] = useState(true);
+
+  // Fetch Pierre transactions on mount
+  useEffect(() => {
+    const fetchPierreTransactions = async () => {
+      setPierreLoading(true);
+      setPierreError(null);
+      try {
+        const startDate = subMonths(new Date(), 3);
+        const params = new URLSearchParams();
+        params.append('startDate', format(startDate, 'yyyy-MM-dd'));
+        params.append('endDate', format(new Date(), 'yyyy-MM-dd'));
+        params.append('format', 'raw');
+
+        const response = await fetch(`/api/pierre/transactions?${params.toString()}`);
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.error || `API error: ${response.statusText}`);
+        }
+
+        const data: PierreTransactionsResponse = await response.json();
+        if (data.success) {
+          setPierreTransactions(data.data || []);
+        }
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Erro ao buscar transações do Pierre';
+        setPierreError(message);
+        console.error('Error fetching Pierre transactions:', err);
+      } finally {
+        setPierreLoading(false);
+      }
+    };
+
+    if (showPierreTransactions) {
+      fetchPierreTransactions();
+    }
+  }, [showPierreTransactions]);
+
+  // Combine regular and Pierre transactions
+  const combinedTransactions = useMemo((): CombinedTransaction[] => {
+    const regular = transactions.map(t => ({
+      ...t,
+      source: (t.source || 'manual') as 'manual' | 'import' | 'pierre'
+    })) as CombinedTransaction[];
+
+    const pierre = pierreTransactions.map(t => ({
+      id: t.id,
+      type: t.type as 'DEBIT' | 'CREDIT',
+      amount: t.amount,
+      date: t.date,
+      description: t.description,
+      category: t.category,
+      categoryName: t.category,
+      source: 'pierre' as const,
+      status: t.status,
+      account_name: t.account_name
+    })) as CombinedTransaction[];
+
+    return showPierreTransactions ? [...regular, ...pierre] : regular;
+  }, [transactions, pierreTransactions, showPierreTransactions]);
+
   // Gerar lista de meses disponíveis
   const availableMonths = useMemo(() => {
     const months = new Set<string>();
-    transactions.forEach(transaction => {
+    combinedTransactions.forEach(transaction => {
       const date = new Date(transaction.date);
       const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
       months.add(monthKey);
@@ -74,7 +157,7 @@ export default function TransactionList({ showFilters = true }: TransactionListP
         month: parseInt(month)
       };
     });
-  }, [transactions]);
+  }, [combinedTransactions]);
 
   // Aplicar filtro de mês
   const handleMonthFilter = (monthKey: string) => {
@@ -98,14 +181,22 @@ export default function TransactionList({ showFilters = true }: TransactionListP
     }
   };
 
-  // Aplicar filtros e buscas e busca
+  // Aplicar filtros e buscas
   const filteredTransactions = useMemo(() => {
-    let filtered = getFilteredTransactions();
+    let filtered = [...combinedTransactions];
+
+    // Aplicar filtro de data
+    if (filters.startDate) {
+      filtered = filtered.filter(t => new Date(t.date) >= new Date(filters.startDate!));
+    }
+    if (filters.endDate) {
+      filtered = filtered.filter(t => new Date(t.date) <= new Date(filters.endDate!));
+    }
 
     // Aplicar busca local
     if (searchTerm) {
       const search = searchTerm.toLowerCase();
-      filtered = filtered.filter(t => 
+      filtered = filtered.filter(t =>
         t.description.toLowerCase().includes(search) ||
         t.categoryName?.toLowerCase().includes(search) ||
         t.amount.toString().includes(search)
@@ -115,7 +206,7 @@ export default function TransactionList({ showFilters = true }: TransactionListP
     // Aplicar ordenação
     filtered.sort((a, b) => {
       let aValue: any, bValue: any;
-      
+
       switch (sortField) {
         case 'date':
           aValue = new Date(a.date);
@@ -133,6 +224,10 @@ export default function TransactionList({ showFilters = true }: TransactionListP
           aValue = a.description;
           bValue = b.description;
           break;
+        case 'source':
+          aValue = a.source;
+          bValue = b.source;
+          break;
         default:
           return 0;
       }
@@ -143,7 +238,7 @@ export default function TransactionList({ showFilters = true }: TransactionListP
     });
 
     return filtered;
-  }, [getFilteredTransactions, searchTerm, sortField, sortDirection]);
+  }, [combinedTransactions, searchTerm, sortField, sortDirection, filters.startDate, filters.endDate]);
 
   const handleSearch = () => {
     setFilters({ ...filters, search: searchTerm });
@@ -190,8 +285,44 @@ export default function TransactionList({ showFilters = true }: TransactionListP
     setSearchTerm('');
   };
 
+  const getTransactionColor = (type: string) => {
+    if (type === 'receita' || type === 'CREDIT') return 'text-green-600';
+    if (type === 'despesa' || type === 'DEBIT') return 'text-red-600';
+    return 'text-gray-600';
+  };
+
+  const getSourceBadge = (source: string) => {
+    if (source === 'pierre') return <Badge variant="outline" className="bg-purple-50">Pierre</Badge>;
+    if (source === 'import') return <Badge variant="outline">Importado</Badge>;
+    return null;
+  };
+
+  const getStatusBadge = (status?: string) => {
+    if (status === 'PENDING') return <Badge variant="secondary">Pendente</Badge>;
+    if (status === 'POSTED') return <Badge variant="default">Finalizado</Badge>;
+    return null;
+  };
+
   return (
     <div className="space-y-6">
+      {/* Pierre Error Alert */}
+      {pierreError && (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>
+            {pierreError}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setPierreError(null)}
+              className="ml-2"
+            >
+              Descartar
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
+
       {/* Barra de Busca e Filtros */}
       {showFilters && (
         <Card>
@@ -384,6 +515,19 @@ export default function TransactionList({ showFilters = true }: TransactionListP
               <Button variant="outline" onClick={clearFilters} className="w-full sm:w-auto">
                 Limpar Filtros
               </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowPierreTransactions(!showPierreTransactions)}
+              >
+                {showPierreTransactions ? '✓' : ''} Incluir Pierre
+              </Button>
+              {pierreLoading && (
+                <Button variant="outline" disabled>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Carregando Pierre...
+                </Button>
+              )}
               <ExportModal
                 open={exportModalOpen}
                 onOpenChange={setExportModalOpen}
@@ -426,6 +570,7 @@ export default function TransactionList({ showFilters = true }: TransactionListP
                   <SelectItem value="amount-asc">Valor (Menor)</SelectItem>
                   <SelectItem value="category-asc">Categoria (A-Z)</SelectItem>
                   <SelectItem value="description-asc">Descrição (A-Z)</SelectItem>
+                  <SelectItem value="source-asc">Origem (A-Z)</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -441,11 +586,14 @@ export default function TransactionList({ showFilters = true }: TransactionListP
           ) : (
             <div className="space-y-2">
               {filteredTransactions.map((transaction) => {
-                const category = getCategoryInfo(transaction.category);
+                const category = transaction.source === 'pierre' ? null : getCategoryInfo(transaction.category);
+                const isRegular = transaction.source === 'manual' || transaction.source === 'import';
                 return (
                   <div
                     key={transaction.id}
-                    className="flex flex-col sm:flex-row sm:items-center gap-3 p-4 rounded-lg border hover:bg-gray-50 transition-colors"
+                    className={`flex flex-col sm:flex-row sm:items-center gap-3 p-4 rounded-lg border hover:bg-gray-50 transition-colors ${
+                      transaction.source === 'pierre' ? 'border-purple-100 bg-purple-50' : ''
+                    }`}
                   >
                     <div className="flex items-center gap-3 flex-1">
                       <div className="text-2xl flex-shrink-0">
@@ -455,43 +603,47 @@ export default function TransactionList({ showFilters = true }: TransactionListP
                         <h3 className="font-medium truncate">{transaction.description}</h3>
                         <div className="flex flex-wrap items-center gap-2 mt-1">
                           <Badge
-                            variant={transaction.type === 'receita' ? 'default' : 'secondary'}
-                            className={transaction.type === 'receita' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}
+                            variant={transaction.type === 'receita' || transaction.type === 'CREDIT' ? 'default' : 'secondary'}
+                            className={transaction.type === 'receita' || transaction.type === 'CREDIT' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}
                           >
-                            {category?.name || transaction.category}
+                            {category?.name || transaction.categoryName || transaction.category}
                           </Badge>
                           <span className="text-sm text-gray-500">
                             {formatDate(transaction.date)}
                           </span>
-                          {transaction.source !== 'manual' && (
-                            <Badge variant="outline" className="text-xs">
-                              {transaction.source}
-                            </Badge>
+                          {transaction.account_name && (
+                            <span className="text-xs text-gray-500">
+                              {transaction.account_name}
+                            </span>
                           )}
+                          {getSourceBadge(transaction.source)}
+                          {getStatusBadge(transaction.status)}
                         </div>
                       </div>
                     </div>
                     <div className="flex items-center justify-between sm:justify-end gap-3">
-                      <div className={`text-lg font-semibold ${
-                        transaction.type === 'receita' ? 'text-green-600' : 'text-red-600'
-                      }`}>
-                        {transaction.type === 'receita' ? '+' : '-'}{formatCurrency(transaction.amount)}
+                      <div className={`text-lg font-semibold ${getTransactionColor(transaction.type)}`}>
+                        {transaction.type === 'receita' || transaction.type === 'CREDIT' ? '+' : '-'}{formatCurrency(transaction.amount)}
                       </div>
                       <div className="flex gap-1 flex-shrink-0">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleEdit(transaction)}
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleDelete(transaction.id)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                        {isRegular && (
+                          <>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleEdit(transaction as Transaction)}
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDelete(transaction.id)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </>
+                        )}
                       </div>
                     </div>
                   </div>

@@ -1,7 +1,9 @@
-import { useMemo } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { useFinancial } from '../contexts/FinancialContext';
 import { useInvestments } from '../contexts/InvestmentContext';
 import { FinancialSummary } from '@shared/financial-types';
+import { PierreTransaction, PierreTransactionsResponse } from '@shared/pierre-types';
+import { format, subMonths } from 'date-fns';
 
 export function useFinancialSummary(): FinancialSummary & {
   investmentValue: number;
@@ -16,8 +18,35 @@ export function useFinancialSummary(): FinancialSummary & {
   monthlyReceitas: number;
   monthlyDespesas: number;
 } {
-  const { summary: transactionSummary, transactions, getFilteredTransactions, fgtsBalance } = useFinancial();
+  const { summary: transactionSummary, transactions, getFilteredTransactions, fgtsBalance, filters } = useFinancial();
   const { summary: investmentSummary, getTotalAllocatedToGoals, investments } = useInvestments();
+
+  const [pierreTransactions, setPierreTransactions] = useState<PierreTransaction[]>([]);
+
+  // Fetch Pierre transactions
+  useEffect(() => {
+    const fetchPierreTransactions = async () => {
+      try {
+        const startDate = subMonths(new Date(), 3);
+        const params = new URLSearchParams();
+        params.append('startDate', format(startDate, 'yyyy-MM-dd'));
+        params.append('endDate', format(new Date(), 'yyyy-MM-dd'));
+        params.append('format', 'raw');
+
+        const response = await fetch(`/api/pierre/transactions?${params.toString()}`);
+        if (response.ok) {
+          const data: PierreTransactionsResponse = await response.json();
+          if (data.success) {
+            setPierreTransactions(data.data || []);
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching Pierre transactions:', error);
+      }
+    };
+
+    fetchPierreTransactions();
+  }, []);
 
   return useMemo(() => {
     const allocatedToGoals = getTotalAllocatedToGoals();
@@ -25,56 +54,71 @@ export function useFinancialSummary(): FinancialSummary & {
     const currentMonth = now.getMonth();
     const currentYear = now.getFullYear();
 
-    // Transações do mês atual
-    const currentMonthTransactions = transactions.filter(t => {
-      const transactionDate = new Date(t.date);
-      return transactionDate.getMonth() === currentMonth && transactionDate.getFullYear() === currentYear;
-    });
+    // Obter transações filtradas (respeita os filtros de data)
+    const filteredTransactions = getFilteredTransactions();
 
-    // Receitas e despesas do mês
-    const monthlyReceitas = currentMonthTransactions
+    // Filtrar transações do Pierre de acordo com os períodos filtrados
+    let filteredPierreTransactions = pierreTransactions;
+    if (filters.startDate) {
+      filteredPierreTransactions = filteredPierreTransactions.filter(
+        t => new Date(t.date) >= new Date(filters.startDate!)
+      );
+    }
+    if (filters.endDate) {
+      filteredPierreTransactions = filteredPierreTransactions.filter(
+        t => new Date(t.date) <= new Date(filters.endDate!)
+      );
+    }
+
+    // Receitas e despesas respeitando os filtros aplicados (incluindo Pierre)
+    const monthlyReceitas = filteredTransactions
       .filter(t => t.type === 'receita')
-      .reduce((sum, t) => sum + t.amount, 0);
+      .reduce((sum, t) => sum + t.amount, 0) +
+      filteredPierreTransactions
+        .filter(t => t.type === 'CREDIT')
+        .reduce((sum, t) => sum + t.amount, 0);
 
-    const monthlyDespesas = currentMonthTransactions
+    const monthlyDespesas = filteredTransactions
       .filter(t => t.type === 'despesa')
-      .reduce((sum, t) => sum + t.amount, 0);
+      .reduce((sum, t) => sum + t.amount, 0) +
+      filteredPierreTransactions
+        .filter(t => t.type === 'DEBIT')
+        .reduce((sum, t) => sum + t.amount, 0);
 
-    // Saldo do mês atual (apenas transações, sem investimentos de meses anteriores)
+    // Saldo respeitando os filtros aplicados
     const saldoMes = monthlyReceitas - monthlyDespesas;
 
-    // Investimentos feitos no mês atual
-    const investmentsThisMonth = investments.filter(inv => {
+    // Investimentos respeitando filtros
+    const investmentsFiltered = investments.filter(inv => {
       const invDate = new Date(inv.purchaseDate);
-      return invDate.getMonth() === currentMonth && invDate.getFullYear() === currentYear;
+      if (filters.startDate && invDate < new Date(filters.startDate)) return false;
+      if (filters.endDate && invDate > new Date(filters.endDate)) return false;
+      return true;
     });
 
-    const investmentValueThisMonth = investmentsThisMonth.reduce((sum, inv) => sum + (inv.purchasePrice * inv.quantity), 0);
+    const investmentValueThisMonth = investmentsFiltered.reduce((sum, inv) => sum + (inv.purchasePrice * inv.quantity), 0);
 
-    // Saldo total respeitando filtros aplicados
-    const filteredTransactions = getFilteredTransactions();
-    const totalReceitas = filteredTransactions.filter(t => t.type === 'receita').reduce((sum, t) => sum + t.amount, 0);
-    const totalDespesas = filteredTransactions.filter(t => t.type === 'despesa').reduce((sum, t) => sum + t.amount, 0);
-    const saldoTotal = totalReceitas - totalDespesas;
+    // Saldo total = receitas - despesas (já calculados com filtros aplicados)
+    const saldoTotal = monthlyReceitas - monthlyDespesas;
 
-    // Saldo com investimentos
-    const saldoTotalComInvestimentos = saldoTotal + investmentSummary.currentValue;
+    // Saldo com investimentos filtrados
+    const saldoTotalComInvestimentos = saldoTotal + investmentValueThisMonth;
 
-    // Saldo total incluindo FGTS
+    // Saldo total incluindo FGTS (FGTS é sempre incluso, não respeita filtros)
     const totalWithFGTS = saldoTotalComInvestimentos + fgtsBalance;
 
     // Saldos disponíveis (descontando alocações para objetivos)
-    const availableBalanceMonth = saldoMes - allocatedToGoals; // Apenas saldo mensal sem investimentos
-    const availableBalanceTotal = saldoTotalComInvestimentos + fgtsBalance - allocatedToGoals;
+    const availableBalanceMonth = saldoMes - allocatedToGoals;
+    const availableBalanceTotal = totalWithFGTS - allocatedToGoals;
 
     return {
       ...transactionSummary,
-      saldoAtual: saldoTotalComInvestimentos, // Mantém compatibilidade
+      saldoAtual: saldoTotalComInvestimentos,
       saldoMes,
       saldoTotal,
-      investmentValue: investmentSummary.currentValue,
+      investmentValue: investmentValueThisMonth,
       allocatedToGoals,
-      availableBalance: availableBalanceTotal, // Mantém compatibilidade
+      availableBalance: availableBalanceTotal,
       availableBalanceMonth,
       availableBalanceTotal,
       fgtsBalance,
@@ -82,5 +126,5 @@ export function useFinancialSummary(): FinancialSummary & {
       monthlyReceitas,
       monthlyDespesas
     };
-  }, [transactionSummary, transactions, getFilteredTransactions, investmentSummary, getTotalAllocatedToGoals, investments, fgtsBalance]);
+  }, [transactionSummary, transactions, getFilteredTransactions, investmentSummary, getTotalAllocatedToGoals, investments, fgtsBalance, pierreTransactions, filters]);
 }
