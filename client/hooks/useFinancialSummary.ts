@@ -63,20 +63,13 @@ export function useFinancialSummary(): FinancialSummary & {
     // Obter transações filtradas (respeita os filtros de data)
     const filteredTransactions = getFilteredTransactions();
 
-    // Filtrar transações do Pierre de acordo com os períodos filtrados
-    // Se não houver filtros customizados, usar apenas as do mês atual (já buscadas)
-    // Se houver filtros, aplicá-los
-    let filteredPierreTransactions = pierreTransactions;
-    if (filters.startDate) {
-      filteredPierreTransactions = filteredPierreTransactions.filter(
-        t => new Date(t.date) >= new Date(filters.startDate!)
-      );
-    }
-    if (filters.endDate) {
-      filteredPierreTransactions = filteredPierreTransactions.filter(
-        t => new Date(t.date) <= new Date(filters.endDate!)
-      );
-    }
+    // Pierre transactions: ALWAYS use current month, ignore custom filters
+    // This ensures the "Saldo Mês Atual" always shows current month data
+    let filteredPierreTransactions = pierreTransactions.filter(t => {
+      const transactionDate = new Date(t.date);
+      return transactionDate.getMonth() === currentMonth &&
+             transactionDate.getFullYear() === currentYear;
+    });
 
     // Receitas e despesas respeitando os filtros aplicados (incluindo Pierre)
     const monthlyReceitas = filteredTransactions
