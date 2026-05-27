@@ -44,7 +44,7 @@ export default function PierreTransactionsWindow({ open = true, onOpenChange }: 
     return format(date, 'yyyy-MM-dd');
   });
   const [endDate, setEndDate] = useState(format(new Date(), 'yyyy-MM-dd'));
-  const [categoryFilter, setCategoryFilter] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('all');
   const [typeFilter, setTypeFilter] = useState<'all' | 'DEBIT' | 'CREDIT'>('all');
   const [statusFilter, setStatusFilter] = useState<'all' | 'POSTED' | 'PENDING'>('all');
 
@@ -90,10 +90,14 @@ export default function PierreTransactionsWindow({ open = true, onOpenChange }: 
   useEffect(() => {
     let filtered = [...transactions];
 
-    if (categoryFilter) {
-      filtered = filtered.filter(t =>
-        t.category?.toLowerCase().includes(categoryFilter.toLowerCase())
-      );
+    if (categoryFilter && categoryFilter !== 'all') {
+      if (categoryFilter === 'uncategorized') {
+        filtered = filtered.filter(t => !t.category);
+      } else {
+        filtered = filtered.filter(t =>
+          t.category?.toLowerCase().includes(categoryFilter.toLowerCase())
+        );
+      }
     }
 
     if (typeFilter !== 'all') {
@@ -218,9 +222,9 @@ export default function PierreTransactionsWindow({ open = true, onOpenChange }: 
                   <SelectValue placeholder="Todas" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Todas</SelectItem>
+                  <SelectItem value="all">Todas</SelectItem>
                   {uniqueCategories.map(cat => (
-                    <SelectItem key={cat} value={cat || ''}>{cat || 'Sem categoria'}</SelectItem>
+                    <SelectItem key={cat} value={cat || 'uncategorized'}>{cat || 'Sem categoria'}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
