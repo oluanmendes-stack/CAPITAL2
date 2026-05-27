@@ -200,6 +200,71 @@ class PierreFinanceService {
     };
   }
 
+  async getBills(accountId?: string) {
+    const params = new URLSearchParams();
+    if (accountId) params.append('accountId', accountId);
+
+    const url = this.useServerProxy
+      ? `/api/pierre/bills${params.toString() ? '?' + params.toString() : ''}`
+      : `${PIERRE_API_BASE}/tools/api/get-bills${params.toString() ? '?' + params.toString() : ''}`;
+
+    const headers = this.useServerProxy ? this.getHeaders() : {
+      'Authorization': `Bearer ${this.apiKey}`,
+      'Content-Type': 'application/json'
+    };
+
+    const response = await fetch(url, {
+      method: 'GET',
+      headers
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new Error(
+        `Failed to fetch bills from Pierre: ${error.error || response.statusText}`
+      );
+    }
+
+    const data = await response.json();
+    if (!data.success) {
+      throw new Error('Pierre API returned unsuccessful response');
+    }
+    return data;
+  }
+
+  async getBillSummary(accountId?: string, closingDay?: number) {
+    const params = new URLSearchParams();
+    if (accountId) params.append('accountId', accountId);
+    if (closingDay) params.append('closingDay', String(closingDay));
+
+    const url = this.useServerProxy
+      ? `/api/pierre/bill-summary${params.toString() ? '?' + params.toString() : ''}`
+      : `${PIERRE_API_BASE}/tools/api/get-bill-summary${params.toString() ? '?' + params.toString() : ''}`;
+
+    const headers = this.useServerProxy ? this.getHeaders() : {
+      'Authorization': `Bearer ${this.apiKey}`,
+      'Content-Type': 'application/json'
+    };
+
+    const response = await fetch(url, {
+      method: 'GET',
+      headers
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new Error(
+        `Failed to fetch bill summary from Pierre: ${error.error || response.statusText}`
+      );
+    }
+
+    const data = await response.json();
+    if (!data.success) {
+      throw new Error('Pierre API returned unsuccessful response');
+    }
+    return data;
+  }
+
   async getInstallments() {
     const url = this.useServerProxy
       ? '/api/pierre/installments'
@@ -227,6 +292,41 @@ class PierreFinanceService {
       throw new Error('Pierre API returned unsuccessful response');
     }
     return data;
+  }
+
+  async getCreditCardTransactions() {
+    try {
+      const billsData = await this.getBills();
+      const transactions = [];
+
+      if (billsData.data && Array.isArray(billsData.data)) {
+        billsData.data.forEach((bill: any) => {
+          if (bill.transactions && Array.isArray(bill.transactions)) {
+            bill.transactions.forEach((transaction: any) => {
+              transactions.push({
+                id: transaction.id,
+                accountId: bill.accountId,
+                accountName: bill.accountName,
+                provider: 'pierre',
+                date: transaction.date,
+                description: transaction.description,
+                amount: Math.abs(transaction.amount || 0),
+                type: transaction.type === 'CREDIT' ? 'credit' : 'debit',
+                category: transaction.category,
+                merchantName: transaction.description,
+                externalId: transaction.id,
+                status: transaction.status
+              });
+            });
+          }
+        });
+      }
+
+      return transactions;
+    } catch (error) {
+      console.error('Error fetching credit card transactions:', error);
+      return [];
+    }
   }
 
   async syncData(): Promise<PierreSyncResult> {
