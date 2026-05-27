@@ -17,20 +17,26 @@ export function useFinancialSummary(): FinancialSummary & {
   totalWithFGTS: number;
   monthlyReceitas: number;
   monthlyDespesas: number;
+  pierreReceitas: number;
+  pierreDespesas: number;
+  pierreTransactionCount: number;
 } {
   const { summary: transactionSummary, transactions, getFilteredTransactions, fgtsBalance, filters } = useFinancial();
   const { summary: investmentSummary, getTotalAllocatedToGoals, investments } = useInvestments();
 
   const [pierreTransactions, setPierreTransactions] = useState<PierreTransaction[]>([]);
 
-  // Fetch Pierre transactions
+  // Fetch Pierre transactions for current month
   useEffect(() => {
     const fetchPierreTransactions = async () => {
       try {
-        const startDate = subMonths(new Date(), 3);
+        const now = new Date();
+        const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+        const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+
         const params = new URLSearchParams();
-        params.append('startDate', format(startDate, 'yyyy-MM-dd'));
-        params.append('endDate', format(new Date(), 'yyyy-MM-dd'));
+        params.append('startDate', format(firstDay, 'yyyy-MM-dd'));
+        params.append('endDate', format(lastDay, 'yyyy-MM-dd'));
         params.append('format', 'raw');
 
         const response = await fetch(`/api/pierre/transactions?${params.toString()}`);
@@ -57,33 +63,23 @@ export function useFinancialSummary(): FinancialSummary & {
     // Obter transações filtradas (respeita os filtros de data)
     const filteredTransactions = getFilteredTransactions();
 
-    // Filtrar transações do Pierre de acordo com os períodos filtrados
-    let filteredPierreTransactions = pierreTransactions;
-    if (filters.startDate) {
-      filteredPierreTransactions = filteredPierreTransactions.filter(
-        t => new Date(t.date) >= new Date(filters.startDate!)
-      );
-    }
-    if (filters.endDate) {
-      filteredPierreTransactions = filteredPierreTransactions.filter(
-        t => new Date(t.date) <= new Date(filters.endDate!)
-      );
-    }
+    // Pierre transactions: ALWAYS use current month, ignore custom filters
+    // This ensures the "Saldo Mês Atual" always shows current month data
+    let filteredPierreTransactions = pierreTransactions.filter(t => {
+      const transactionDate = new Date(t.date);
+      return transactionDate.getMonth() === currentMonth &&
+             transactionDate.getFullYear() === currentYear;
+    });
 
-    // Receitas e despesas respeitando os filtros aplicados (incluindo Pierre)
-    const monthlyReceitas = filteredTransactions
-      .filter(t => t.type === 'receita')
-      .reduce((sum, t) => sum + t.amount, 0) +
-      filteredPierreTransactions
-        .filter(t => t.type === 'CREDIT')
-        .reduce((sum, t) => sum + t.amount, 0);
+    // Use ONLY Pierre transactions for the dashboard overview
+    // Local transactions are ignored to match Pierre API data
+    const monthlyReceitas = filteredPierreTransactions
+      .filter(t => t.type === 'CREDIT')
+      .reduce((sum, t) => sum + t.amount, 0);
 
-    const monthlyDespesas = filteredTransactions
-      .filter(t => t.type === 'despesa')
-      .reduce((sum, t) => sum + t.amount, 0) +
-      filteredPierreTransactions
-        .filter(t => t.type === 'DEBIT')
-        .reduce((sum, t) => sum + t.amount, 0);
+    const monthlyDespesas = filteredPierreTransactions
+      .filter(t => t.type === 'DEBIT')
+      .reduce((sum, t) => sum + t.amount, 0);
 
     // Saldo respeitando os filtros aplicados
     const saldoMes = monthlyReceitas - monthlyDespesas;
@@ -111,9 +107,18 @@ export function useFinancialSummary(): FinancialSummary & {
     const availableBalanceMonth = saldoMes - allocatedToGoals;
     const availableBalanceTotal = totalWithFGTS - allocatedToGoals;
 
+    // Pierre-only values for dashboard display (always current month)
+    const pierreReceitas = monthlyReceitas;
+    const pierreDespesas = monthlyDespesas;
+
     return {
-      ...transactionSummary,
+      // Use Pierre data only, don't spread transactionSummary which includes local transactions
+      totalReceitas: pierreReceitas,
+      totalDespesas: pierreDespesas,
       saldoAtual: saldoTotalComInvestimentos,
+      variacaoMensal: 0,
+      maioresGastos: [],
+      // Additional fields
       saldoMes,
       saldoTotal,
       investmentValue: investmentValueThisMonth,
@@ -123,8 +128,11 @@ export function useFinancialSummary(): FinancialSummary & {
       availableBalanceTotal,
       fgtsBalance,
       totalWithFGTS,
-      monthlyReceitas,
-      monthlyDespesas
+      monthlyReceitas: pierreReceitas,
+      monthlyDespesas: pierreDespesas,
+      pierreReceitas,
+      pierreDespesas,
+      pierreTransactionCount: filteredPierreTransactions.length
     };
   }, [transactionSummary, transactions, getFilteredTransactions, investmentSummary, getTotalAllocatedToGoals, investments, fgtsBalance, pierreTransactions, filters]);
 }
