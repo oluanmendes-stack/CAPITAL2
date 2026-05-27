@@ -169,14 +169,17 @@ export default function CapitalDashboard() {
   const [selectedMonth, setSelectedMonth] = useState<string>(''); // Para filtro de mês na visão geral
   const [pierreTransactionCount, setPierreTransactionCount] = useState(0);
 
-  // Fetch Pierre transactions count
+  // Fetch Pierre transactions count for current month
   useEffect(() => {
     const fetchPierreCount = async () => {
       try {
-        const startDate = subMonths(new Date(), 3);
+        const now = new Date();
+        const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+        const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+
         const params = new URLSearchParams();
-        params.append('startDate', format(startDate, 'yyyy-MM-dd'));
-        params.append('endDate', format(new Date(), 'yyyy-MM-dd'));
+        params.append('startDate', format(firstDay, 'yyyy-MM-dd'));
+        params.append('endDate', format(lastDay, 'yyyy-MM-dd'));
         params.append('format', 'raw');
 
         const response = await fetch(`/api/pierre/transactions?${params.toString()}`);
@@ -297,8 +300,8 @@ export default function CapitalDashboard() {
   const recentTransactions = getFilteredTransactions().slice(0, 5);
 
   const getSaldoTrend = () => {
-    if (summary.availableBalanceMonth > 0) return 'up';
-    if (summary.availableBalanceMonth < 0) return 'down';
+    if (summary.saldoMes > 0) return 'up';
+    if (summary.saldoMes < 0) return 'down';
     return 'neutral';
   };
 
@@ -403,7 +406,7 @@ export default function CapitalDashboard() {
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-2 sm:gap-4">
               <DashboardCard
                 title="Saldo Mês Atual"
-                value={formatCurrency(summary.availableBalanceMonth)}
+                value={formatCurrency(summary.saldoMes)}
                 icon={<Wallet />}
                 trend={getSaldoTrend()}
               />

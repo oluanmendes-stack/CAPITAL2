@@ -23,14 +23,17 @@ export function useFinancialSummary(): FinancialSummary & {
 
   const [pierreTransactions, setPierreTransactions] = useState<PierreTransaction[]>([]);
 
-  // Fetch Pierre transactions
+  // Fetch Pierre transactions for current month
   useEffect(() => {
     const fetchPierreTransactions = async () => {
       try {
-        const startDate = subMonths(new Date(), 3);
+        const now = new Date();
+        const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+        const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+
         const params = new URLSearchParams();
-        params.append('startDate', format(startDate, 'yyyy-MM-dd'));
-        params.append('endDate', format(new Date(), 'yyyy-MM-dd'));
+        params.append('startDate', format(firstDay, 'yyyy-MM-dd'));
+        params.append('endDate', format(lastDay, 'yyyy-MM-dd'));
         params.append('format', 'raw');
 
         const response = await fetch(`/api/pierre/transactions?${params.toString()}`);
@@ -58,6 +61,8 @@ export function useFinancialSummary(): FinancialSummary & {
     const filteredTransactions = getFilteredTransactions();
 
     // Filtrar transações do Pierre de acordo com os períodos filtrados
+    // Se não houver filtros customizados, usar apenas as do mês atual (já buscadas)
+    // Se houver filtros, aplicá-los
     let filteredPierreTransactions = pierreTransactions;
     if (filters.startDate) {
       filteredPierreTransactions = filteredPierreTransactions.filter(
