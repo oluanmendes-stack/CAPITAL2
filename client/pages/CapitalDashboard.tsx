@@ -442,7 +442,7 @@ export default function CapitalDashboard() {
               />
               <DashboardCard
                 title="Transações"
-                value={pierreTransactionCount.toString()}
+                value={(summary.pierreTransactionCount || pierreTransactionCount).toString()}
                 icon={<CreditCard />}
               />
               <DashboardCard

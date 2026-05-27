@@ -112,8 +112,13 @@ export function useFinancialSummary(): FinancialSummary & {
     const pierreDespesas = monthlyDespesas;
 
     return {
-      ...transactionSummary,
+      // Use Pierre data only, don't spread transactionSummary which includes local transactions
+      totalReceitas: pierreReceitas,
+      totalDespesas: pierreDespesas,
       saldoAtual: saldoTotalComInvestimentos,
+      variacaoMensal: 0,
+      maioresGastos: [],
+      // Additional fields
       saldoMes,
       saldoTotal,
       investmentValue: investmentValueThisMonth,
@@ -123,11 +128,11 @@ export function useFinancialSummary(): FinancialSummary & {
       availableBalanceTotal,
       fgtsBalance,
       totalWithFGTS,
-      monthlyReceitas,
-      monthlyDespesas,
+      monthlyReceitas: pierreReceitas,
+      monthlyDespesas: pierreDespesas,
       pierreReceitas,
       pierreDespesas,
-      pierceTransactionCount: filteredPierreTransactions.length
+      pierreTransactionCount: filteredPierreTransactions.length
     };
   }, [transactionSummary, transactions, getFilteredTransactions, investmentSummary, getTotalAllocatedToGoals, investments, fgtsBalance, pierreTransactions, filters]);
 }
