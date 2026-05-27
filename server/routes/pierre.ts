@@ -1,6 +1,6 @@
 import { RequestHandler } from 'express';
 
-const PIERRE_API_BASE = 'https://www.pierre.finance/tools/api';
+const PIERRE_API_BASE = 'https://www.pierre.finance';
 
 interface PierreProxyRequest {
   endpoint: 'accounts' | 'transactions';
@@ -22,7 +22,7 @@ export const handlePierreProxy: RequestHandler = async (req, res) => {
 
     // Build query string if params provided
     const queryString = params ? '?' + new URLSearchParams(params).toString() : '';
-    const url = `${PIERRE_API_BASE}/get-${endpoint}${queryString}`;
+    const url = `${PIERRE_API_BASE}/tools/api/get-${endpoint}${queryString}`;
 
     const response = await fetch(url, {
       method: 'GET',
@@ -58,7 +58,7 @@ export const getPierreAccounts: RequestHandler = async (req, res) => {
       return res.status(500).json({ error: 'Pierre API key not configured' });
     }
 
-    const response = await fetch(`${PIERRE_API_BASE}/get-accounts`, {
+    const response = await fetch(`${PIERRE_API_BASE}/tools/api/get-accounts`, {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${apiKey}`,
@@ -92,15 +92,32 @@ export const getPierreTransactions: RequestHandler = async (req, res) => {
       return res.status(500).json({ error: 'Pierre API key not configured' });
     }
 
-    const { startDate, endDate, categories, format = 'raw' } = req.query;
+    const {
+      startDate,
+      endDate,
+      categories,
+      format = 'raw',
+      minAmount,
+      maxAmount,
+      accountType,
+      accountSubtype,
+      includeStatus,
+      clientMessage
+    } = req.query;
 
     const params = new URLSearchParams();
     if (startDate) params.append('startDate', String(startDate));
     if (endDate) params.append('endDate', String(endDate));
     if (categories) params.append('categories', String(categories));
+    if (minAmount) params.append('minAmount', String(minAmount));
+    if (maxAmount) params.append('maxAmount', String(maxAmount));
+    if (accountType) params.append('accountType', String(accountType));
+    if (accountSubtype) params.append('accountSubtype', String(accountSubtype));
+    if (includeStatus) params.append('includeStatus', String(includeStatus));
+    if (clientMessage) params.append('clientMessage', String(clientMessage));
     params.append('format', format as string);
 
-    const url = `${PIERRE_API_BASE}/get-transactions?${params.toString()}`;
+    const url = `${PIERRE_API_BASE}/tools/api/get-transactions?${params.toString()}`;
 
     const response = await fetch(url, {
       method: 'GET',
@@ -129,6 +146,123 @@ export const getPierreTransactions: RequestHandler = async (req, res) => {
   }
 };
 
+export const getPierreBalance: RequestHandler = async (req, res) => {
+  try {
+    const apiKey = process.env.VITE_PIERRE_API_KEY;
+    if (!apiKey) {
+      return res.status(500).json({ error: 'Pierre API key not configured' });
+    }
+
+    const response = await fetch(`${PIERRE_API_BASE}/tools/api/get-balance`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      return res.status(response.status).json({
+        error: 'Failed to fetch balance',
+        details: errorData
+      });
+    }
+
+    const data = await response.json();
+    res.json(data);
+  } catch (error) {
+    console.error('Error fetching Pierre balance:', error);
+    res.status(500).json({
+      error: 'Failed to fetch balance',
+      message: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+};
+
+export const getPierreBills: RequestHandler = async (req, res) => {
+  try {
+    const apiKey = process.env.VITE_PIERRE_API_KEY;
+    if (!apiKey) {
+      return res.status(500).json({ error: 'Pierre API key not configured' });
+    }
+
+    const { accountId } = req.query;
+    const params = new URLSearchParams();
+    if (accountId) params.append('accountId', String(accountId));
+
+    const url = `${PIERRE_API_BASE}/tools/api/get-bills${params.toString() ? '?' + params.toString() : ''}`;
+
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      return res.status(response.status).json({
+        error: 'Failed to fetch bills',
+        details: errorData
+      });
+    }
+
+    const data = await response.json();
+    res.json(data);
+  } catch (error) {
+    console.error('Error fetching Pierre bills:', error);
+    res.status(500).json({
+      error: 'Failed to fetch bills',
+      message: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+};
+
+export const getPierreBillSummary: RequestHandler = async (req, res) => {
+  try {
+    const apiKey = process.env.VITE_PIERRE_API_KEY;
+    if (!apiKey) {
+      return res.status(500).json({ error: 'Pierre API key not configured' });
+    }
+
+    const { accountId, closingDay, startDate, endDate } = req.query;
+    const params = new URLSearchParams();
+    if (accountId) params.append('accountId', String(accountId));
+    if (closingDay) params.append('closingDay', String(closingDay));
+    if (startDate) params.append('startDate', String(startDate));
+    if (endDate) params.append('endDate', String(endDate));
+
+    const url = `${PIERRE_API_BASE}/tools/api/get-bill-summary${params.toString() ? '?' + params.toString() : ''}`;
+
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      return res.status(response.status).json({
+        error: 'Failed to fetch bill summary',
+        details: errorData
+      });
+    }
+
+    const data = await response.json();
+    res.json(data);
+  } catch (error) {
+    console.error('Error fetching Pierre bill summary:', error);
+    res.status(500).json({
+      error: 'Failed to fetch bill summary',
+      message: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+};
+
 export const getPierreInstallments: RequestHandler = async (req, res) => {
   try {
     const apiKey = process.env.VITE_PIERRE_API_KEY;
@@ -136,7 +270,7 @@ export const getPierreInstallments: RequestHandler = async (req, res) => {
       return res.status(500).json({ error: 'Pierre API key not configured' });
     }
 
-    const response = await fetch(`${PIERRE_API_BASE}/get-installments`, {
+    const response = await fetch(`${PIERRE_API_BASE}/tools/api/get-installments`, {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${apiKey}`,
@@ -177,7 +311,7 @@ export const syncPierreData: RequestHandler = async (req, res) => {
 
     // Fetch accounts
     try {
-      const accountsRes = await fetch(`${PIERRE_API_BASE}/get-accounts`, {
+      const accountsRes = await fetch(`${PIERRE_API_BASE}/tools/api/get-accounts`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${apiKey}`,
@@ -205,7 +339,7 @@ export const syncPierreData: RequestHandler = async (req, res) => {
       params.append('endDate', endDate.toISOString().split('T')[0]);
       params.append('format', 'raw');
 
-      const transRes = await fetch(`${PIERRE_API_BASE}/get-transactions?${params.toString()}`, {
+      const transRes = await fetch(`${PIERRE_API_BASE}/tools/api/get-transactions?${params.toString()}`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${apiKey}`,
@@ -225,7 +359,7 @@ export const syncPierreData: RequestHandler = async (req, res) => {
 
     // Fetch installments
     try {
-      const installRes = await fetch(`${PIERRE_API_BASE}/get-installments`, {
+      const installRes = await fetch(`${PIERRE_API_BASE}/tools/api/get-installments`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${apiKey}`,

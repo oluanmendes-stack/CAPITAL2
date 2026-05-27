@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { pierreFinanceService } from '../services/pierreFinanceService';
+import { usePierreAllTransactions } from '../hooks/usePierreAllTransactions';
 import {
   PierreConsolidatedBalance,
   PierreBalance,
@@ -40,6 +41,8 @@ export default function PierreFinanceManager({ open, onOpenChange }: PierreFinan
   const [syncResult, setSyncResult] = useState<PierreSyncResult | null>(null);
   const [lastSync, setLastSync] = useState<string | null>(null);
 
+  const { fetchAndIntegrateAllTransactions } = usePierreAllTransactions();
+
   useEffect(() => {
     if (open) {
       loadData();
@@ -76,6 +79,8 @@ export default function PierreFinanceManager({ open, onOpenChange }: PierreFinan
       if (result.errors.length === 0) {
         // Reload data after sync
         await loadData();
+        // Fetch and integrate all transactions (bank + credit card)
+        await fetchAndIntegrateAllTransactions();
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro ao sincronizar');
@@ -98,8 +103,8 @@ export default function PierreFinanceManager({ open, onOpenChange }: PierreFinan
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
-      <Card className="w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+    <div className="fixed inset-0 z-[100] bg-black/50 flex items-center justify-center p-4">
+      <Card className="w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col z-[101]">
         <CardHeader className="border-b">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -222,8 +227,8 @@ export default function PierreFinanceManager({ open, onOpenChange }: PierreFinan
                   <div>
                     <h3 className="font-semibold text-lg mb-3">Contas Conectadas</h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {balances.map((balance) => (
-                        <Card key={balance.accountId}>
+                      {balances.map((balance, idx) => (
+                        <Card key={balance.accountId || `balance-${idx}`}>
                           <CardHeader className="pb-3">
                             <div className="flex items-center justify-between">
                               <div className="flex items-center gap-2">
@@ -321,7 +326,7 @@ export default function PierreFinanceManager({ open, onOpenChange }: PierreFinan
 
                   {/* Detalhamento de Compras */}
                   {installmentsData.data.purchases.map((purchase, purchaseIdx) => (
-                    <Card key={`purchase_${purchaseIdx}`}>
+                    <Card key={purchase.id || `purchase_${purchaseIdx}`}>
                       <CardHeader>
                         <div className="flex items-start justify-between">
                           <div>
@@ -341,7 +346,7 @@ export default function PierreFinanceManager({ open, onOpenChange }: PierreFinan
                           <div className="space-y-2">
                             {purchase.installments.slice(0, 6).map((installment, idx) => (
                               <div
-                                key={`installment_${purchaseIdx}_${idx}`}
+                                key={installment.id || `installment_${purchaseIdx}_${installment.installmentNumber}`}
                                 className="flex items-center justify-between p-3 bg-gray-50 rounded text-sm"
                               >
                                 <div className="flex items-center gap-2">
