@@ -71,20 +71,15 @@ export function useFinancialSummary(): FinancialSummary & {
              transactionDate.getFullYear() === currentYear;
     });
 
-    // Receitas e despesas respeitando os filtros aplicados (incluindo Pierre)
-    const monthlyReceitas = filteredTransactions
-      .filter(t => t.type === 'receita')
-      .reduce((sum, t) => sum + t.amount, 0) +
-      filteredPierreTransactions
-        .filter(t => t.type === 'CREDIT')
-        .reduce((sum, t) => sum + t.amount, 0);
+    // Use ONLY Pierre transactions for the dashboard overview
+    // Local transactions are ignored to match Pierre API data
+    const monthlyReceitas = filteredPierreTransactions
+      .filter(t => t.type === 'CREDIT')
+      .reduce((sum, t) => sum + t.amount, 0);
 
-    const monthlyDespesas = filteredTransactions
-      .filter(t => t.type === 'despesa')
-      .reduce((sum, t) => sum + t.amount, 0) +
-      filteredPierreTransactions
-        .filter(t => t.type === 'DEBIT')
-        .reduce((sum, t) => sum + t.amount, 0);
+    const monthlyDespesas = filteredPierreTransactions
+      .filter(t => t.type === 'DEBIT')
+      .reduce((sum, t) => sum + t.amount, 0);
 
     // Saldo respeitando os filtros aplicados
     const saldoMes = monthlyReceitas - monthlyDespesas;
@@ -112,14 +107,9 @@ export function useFinancialSummary(): FinancialSummary & {
     const availableBalanceMonth = saldoMes - allocatedToGoals;
     const availableBalanceTotal = totalWithFGTS - allocatedToGoals;
 
-    // Pierre-only values for dashboard display
-    const pierreReceitas = filteredPierreTransactions
-      .filter(t => t.type === 'CREDIT')
-      .reduce((sum, t) => sum + t.amount, 0);
-
-    const pierreDespesas = filteredPierreTransactions
-      .filter(t => t.type === 'DEBIT')
-      .reduce((sum, t) => sum + t.amount, 0);
+    // Pierre-only values for dashboard display (always current month)
+    const pierreReceitas = monthlyReceitas;
+    const pierreDespesas = monthlyDespesas;
 
     return {
       ...transactionSummary,
