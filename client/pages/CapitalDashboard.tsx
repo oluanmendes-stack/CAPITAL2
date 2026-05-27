@@ -30,6 +30,7 @@ import GoalsTab from '../components/GoalsTab';
 import GoalAllocationModal from '../components/GoalAllocationModal';
 import CategoryModal from '../components/CategoryModal';
 import BudgetDivision from '../components/BudgetDivision';
+import PierreTransactionsWindow from '../components/PierreTransactionsWindow';
 import ExpensePieChart from '../components/charts/ExpensePieChart';
 import MonthlyBarChart from '../components/charts/MonthlyBarChart';
 import TrendLineChart from '../components/charts/TrendLineChart';
@@ -340,7 +341,7 @@ export default function CapitalDashboard() {
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4 sm:space-y-6">
-          <TabsList className="grid w-full grid-cols-7 h-auto">
+          <TabsList className="grid w-full grid-cols-8 h-auto">
             <TabsTrigger value="overview" className="text-xs sm:text-sm px-1 sm:px-3 py-2">
               <span className="hidden sm:inline">Visão Geral</span>
               <span className="sm:hidden">Geral</span>
@@ -348,6 +349,10 @@ export default function CapitalDashboard() {
             <TabsTrigger value="transactions" className="text-xs sm:text-sm px-1 sm:px-3 py-2">
               <span className="hidden sm:inline">Transações</span>
               <span className="sm:hidden">Trans.</span>
+            </TabsTrigger>
+            <TabsTrigger value="pierre" className="text-xs sm:text-sm px-1 sm:px-3 py-2">
+              <span className="hidden sm:inline">Pierre</span>
+              <span className="sm:hidden">Pierre</span>
             </TabsTrigger>
             <TabsTrigger value="budget" className="text-xs sm:text-sm px-1 sm:px-3 py-2">
               <span className="hidden sm:inline">Divisão Financeira</span>
@@ -850,6 +855,10 @@ export default function CapitalDashboard() {
 
           <TabsContent value="transactions">
             <TransactionList />
+          </TabsContent>
+
+          <TabsContent value="pierre">
+            <PierreTransactionsWindow open={true} />
           </TabsContent>
 
           <TabsContent value="budget">
