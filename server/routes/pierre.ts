@@ -92,12 +92,29 @@ export const getPierreTransactions: RequestHandler = async (req, res) => {
       return res.status(500).json({ error: 'Pierre API key not configured' });
     }
 
-    const { startDate, endDate, categories, format = 'raw' } = req.query;
+    const {
+      startDate,
+      endDate,
+      categories,
+      format = 'raw',
+      minAmount,
+      maxAmount,
+      accountType,
+      accountSubtype,
+      includeStatus,
+      clientMessage
+    } = req.query;
 
     const params = new URLSearchParams();
     if (startDate) params.append('startDate', String(startDate));
     if (endDate) params.append('endDate', String(endDate));
     if (categories) params.append('categories', String(categories));
+    if (minAmount) params.append('minAmount', String(minAmount));
+    if (maxAmount) params.append('maxAmount', String(maxAmount));
+    if (accountType) params.append('accountType', String(accountType));
+    if (accountSubtype) params.append('accountSubtype', String(accountSubtype));
+    if (includeStatus) params.append('includeStatus', String(includeStatus));
+    if (clientMessage) params.append('clientMessage', String(clientMessage));
     params.append('format', format as string);
 
     const url = `${PIERRE_API_BASE}/tools/api/get-transactions?${params.toString()}`;

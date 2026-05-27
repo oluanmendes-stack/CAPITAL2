@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { pierreFinanceService } from '../services/pierreFinanceService';
-import { usePierreCreditCardTransactions } from '../hooks/usePierreCreditCardTransactions';
+import { usePierreAllTransactions } from '../hooks/usePierreAllTransactions';
 import {
   PierreConsolidatedBalance,
   PierreBalance,
@@ -41,7 +41,7 @@ export default function PierreFinanceManager({ open, onOpenChange }: PierreFinan
   const [syncResult, setSyncResult] = useState<PierreSyncResult | null>(null);
   const [lastSync, setLastSync] = useState<string | null>(null);
 
-  const { fetchAndIntegrateCreditCardTransactions } = usePierreCreditCardTransactions();
+  const { fetchAndIntegrateAllTransactions } = usePierreAllTransactions();
 
   useEffect(() => {
     if (open) {
@@ -79,8 +79,8 @@ export default function PierreFinanceManager({ open, onOpenChange }: PierreFinan
       if (result.errors.length === 0) {
         // Reload data after sync
         await loadData();
-        // Fetch and integrate credit card transactions
-        await fetchAndIntegrateCreditCardTransactions();
+        // Fetch and integrate all transactions (bank + credit card)
+        await fetchAndIntegrateAllTransactions();
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro ao sincronizar');

@@ -62,13 +62,31 @@ class PierreFinanceService {
   async getTransactions(
     startDate?: string,
     endDate?: string,
-    categories?: string[]
+    categories?: string[],
+    minAmount?: number,
+    maxAmount?: number,
+    accountType?: string,
+    accountSubtype?: string
   ): Promise<OpenFinanceTransaction[]> {
     const params = new URLSearchParams();
 
-    if (startDate) params.append('startDate', startDate);
-    if (endDate) params.append('endDate', endDate);
+    // Default to 90 days if no dates provided
+    if (!startDate || !endDate) {
+      const now = new Date();
+      const threeMonthsAgo = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+
+      if (!startDate) params.append('startDate', threeMonthsAgo.toISOString().split('T')[0]);
+      if (!endDate) params.append('endDate', now.toISOString().split('T')[0]);
+    } else {
+      if (startDate) params.append('startDate', startDate);
+      if (endDate) params.append('endDate', endDate);
+    }
+
     if (categories?.length) params.append('categories', categories.join(','));
+    if (minAmount !== undefined) params.append('minAmount', String(minAmount));
+    if (maxAmount !== undefined) params.append('maxAmount', String(maxAmount));
+    if (accountType) params.append('accountType', accountType);
+    if (accountSubtype) params.append('accountSubtype', accountSubtype);
     params.append('format', 'raw');
 
     const url = this.useServerProxy
@@ -98,7 +116,7 @@ class PierreFinanceService {
       throw new Error('Pierre API returned unsuccessful response');
     }
 
-    return data.data.map(transaction => this.mapPierreTransaction(transaction));
+    return (Array.isArray(data.data) ? data.data : []).map(transaction => this.mapPierreTransaction(transaction));
   }
 
   async getBalances(): Promise<PierreBalance[]> {
