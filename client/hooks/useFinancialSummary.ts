@@ -26,16 +26,27 @@ export function useFinancialSummary(): FinancialSummary & {
 
   const [pierreTransactions, setPierreTransactions] = useState<PierreTransaction[]>([]);
 
-  // Fetch Pierre transactions for current month
+  // Fetch Pierre transactions respecting the applied filters
   useEffect(() => {
     const fetchPierreTransactions = async () => {
       try {
         const now = new Date();
-        const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
-        const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
 
-        const startDateStr = format(firstDay, 'yyyy-MM-dd');
-        const endDateStr = format(lastDay, 'yyyy-MM-dd');
+        // Determine the date range to fetch
+        let startDateStr: string;
+        let endDateStr: string;
+
+        if (filters.startDate && filters.endDate) {
+          // Use the applied filters
+          startDateStr = filters.startDate;
+          endDateStr = filters.endDate;
+        } else {
+          // Default to current month
+          const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+          const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+          startDateStr = format(firstDay, 'yyyy-MM-dd');
+          endDateStr = format(lastDay, 'yyyy-MM-dd');
+        }
 
         const params = new URLSearchParams();
         params.append('startDate', startDateStr);
@@ -73,34 +84,32 @@ export function useFinancialSummary(): FinancialSummary & {
             debitsSum: debitsSumBeforeFilter
           });
 
-          // Double-check month filter
-          const currentMonthTransactions = transactions.filter(t => {
+          // Filter transactions by the date range
+          const filteredByDate = transactions.filter(t => {
             try {
               const tDate = new Date(t.date);
-              const tMonth = tDate.getMonth();
-              const tYear = tDate.getFullYear();
-              const currentMonth = now.getMonth();
-              const currentYear = now.getFullYear();
-              return tMonth === currentMonth && tYear === currentYear;
+              const startDate = new Date(startDateStr);
+              const endDate = new Date(endDateStr);
+              return tDate >= startDate && tDate <= endDate;
             } catch {
               return false;
             }
           });
 
-          const creditsAfterFilter = currentMonthTransactions.filter(t => t.type === 'CREDIT');
-          const debitsAfterFilter = currentMonthTransactions.filter(t => t.type === 'DEBIT');
+          const creditsAfterFilter = filteredByDate.filter(t => t.type === 'CREDIT');
+          const debitsAfterFilter = filteredByDate.filter(t => t.type === 'DEBIT');
           const creditsSumAfterFilter = creditsAfterFilter.reduce((sum, t) => sum + t.amount, 0);
           const debitsSumAfterFilter = debitsAfterFilter.reduce((sum, t) => sum + Math.abs(t.amount), 0);
 
           console.log('[useFinancialSummary] After date filter:', {
-            total: currentMonthTransactions.length,
+            total: filteredByDate.length,
             credits: creditsAfterFilter.length,
             creditsSum: creditsSumAfterFilter,
             debits: debitsAfterFilter.length,
             debitsSum: debitsSumAfterFilter
           });
 
-          setPierreTransactions(currentMonthTransactions);
+          setPierreTransactions(filteredByDate);
         } else {
           console.warn('[useFinancialSummary] Pierre API returned unsuccessful response:', data);
           setPierreTransactions([]);
@@ -112,7 +121,7 @@ export function useFinancialSummary(): FinancialSummary & {
     };
 
     fetchPierreTransactions();
-  }, []);
+  }, [filters]);
 
   return useMemo(() => {
     const allocatedToGoals = getTotalAllocatedToGoals();
@@ -123,8 +132,8 @@ export function useFinancialSummary(): FinancialSummary & {
     // Obter transações filtradas (respeita os filtros de data)
     const filteredTransactions = getFilteredTransactions();
 
-    // Pierre transactions already filtered in useEffect to current month
-    // This ensures the "Saldo Mês Atual" always shows current month data
+    // Pierre transactions are already filtered by the applied date filters
+    // This ensures the overview respects the selected date range
     const filteredPierreTransactions = pierreTransactions;
 
     // Use ONLY Pierre transactions for the dashboard overview
@@ -163,7 +172,7 @@ export function useFinancialSummary(): FinancialSummary & {
     const availableBalanceMonth = saldoMes - allocatedToGoals;
     const availableBalanceTotal = totalWithFGTS - allocatedToGoals;
 
-    // Pierre-only values for dashboard display (always current month)
+    // Pierre-only values for dashboard display (respects applied filters)
     const pierreReceitas = monthlyReceitas;
     const pierreDespesas = monthlyDespesas;
 
