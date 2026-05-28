@@ -26,27 +26,16 @@ export function useFinancialSummary(): FinancialSummary & {
 
   const [pierreTransactions, setPierreTransactions] = useState<PierreTransaction[]>([]);
 
-  // Fetch Pierre transactions respecting the applied filters
+  // Fetch Pierre transactions - always fetch a larger window, filter locally
   useEffect(() => {
     const fetchPierreTransactions = async () => {
       try {
         const now = new Date();
 
-        // Determine the date range to fetch
-        let startDateStr: string;
-        let endDateStr: string;
-
-        if (filters.startDate && filters.endDate) {
-          // Use the applied filters
-          startDateStr = filters.startDate;
-          endDateStr = filters.endDate;
-        } else {
-          // Default to current month
-          const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
-          const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-          startDateStr = format(firstDay, 'yyyy-MM-dd');
-          endDateStr = format(lastDay, 'yyyy-MM-dd');
-        }
+        // Always fetch last 3 months to have enough data
+        const startDate = subMonths(now, 3);
+        const startDateStr = format(startDate, 'yyyy-MM-dd');
+        const endDateStr = format(now, 'yyyy-MM-dd');
 
         const params = new URLSearchParams();
         params.append('startDate', startDateStr);
@@ -68,48 +57,7 @@ export function useFinancialSummary(): FinancialSummary & {
         console.log('[useFinancialSummary] Total transactions from API:', data.data?.length || 0);
 
         if (data.success && Array.isArray(data.data)) {
-          const transactions = data.data;
-
-          // Separate by type before filtering
-          const creditsBeforeFilter = transactions.filter(t => t.type === 'CREDIT');
-          const debitsBeforeFilter = transactions.filter(t => t.type === 'DEBIT');
-          const creditsSumBeforeFilter = creditsBeforeFilter.reduce((sum, t) => sum + t.amount, 0);
-          const debitsSumBeforeFilter = debitsBeforeFilter.reduce((sum, t) => sum + t.amount, 0);
-
-          console.log('[useFinancialSummary] Before date filter:', {
-            total: transactions.length,
-            credits: creditsBeforeFilter.length,
-            creditsSum: creditsSumBeforeFilter,
-            debits: debitsBeforeFilter.length,
-            debitsSum: debitsSumBeforeFilter
-          });
-
-          // Filter transactions by the date range
-          const filteredByDate = transactions.filter(t => {
-            try {
-              const tDate = new Date(t.date);
-              const startDate = new Date(startDateStr);
-              const endDate = new Date(endDateStr);
-              return tDate >= startDate && tDate <= endDate;
-            } catch {
-              return false;
-            }
-          });
-
-          const creditsAfterFilter = filteredByDate.filter(t => t.type === 'CREDIT');
-          const debitsAfterFilter = filteredByDate.filter(t => t.type === 'DEBIT');
-          const creditsSumAfterFilter = creditsAfterFilter.reduce((sum, t) => sum + t.amount, 0);
-          const debitsSumAfterFilter = debitsAfterFilter.reduce((sum, t) => sum + Math.abs(t.amount), 0);
-
-          console.log('[useFinancialSummary] After date filter:', {
-            total: filteredByDate.length,
-            credits: creditsAfterFilter.length,
-            creditsSum: creditsSumAfterFilter,
-            debits: debitsAfterFilter.length,
-            debitsSum: debitsSumAfterFilter
-          });
-
-          setPierreTransactions(filteredByDate);
+          setPierreTransactions(data.data);
         } else {
           console.warn('[useFinancialSummary] Pierre API returned unsuccessful response:', data);
           setPierreTransactions([]);
@@ -121,7 +69,7 @@ export function useFinancialSummary(): FinancialSummary & {
     };
 
     fetchPierreTransactions();
-  }, [filters]);
+  }, []);
 
   return useMemo(() => {
     const allocatedToGoals = getTotalAllocatedToGoals();
@@ -132,9 +80,14 @@ export function useFinancialSummary(): FinancialSummary & {
     // Obter transações filtradas (respeita os filtros de data)
     const filteredTransactions = getFilteredTransactions();
 
-    // Pierre transactions are already filtered by the applied date filters
+    // Filter Pierre transactions locally by the applied filters
     // This ensures the overview respects the selected date range
-    const filteredPierreTransactions = pierreTransactions;
+    const filteredPierreTransactions = pierreTransactions.filter(t => {
+      const tDate = new Date(t.date);
+      if (filters.startDate && tDate < new Date(filters.startDate)) return false;
+      if (filters.endDate && tDate > new Date(filters.endDate)) return false;
+      return true;
+    });
 
     // Use ONLY Pierre transactions for the dashboard overview
     // Local transactions are ignored to match Pierre API data
