@@ -107,26 +107,18 @@ export function useFinancialSummary(): FinancialSummary & {
 
     // Use ONLY Pierre transactions for the dashboard overview
     // Local transactions are ignored to match Pierre API data
-    // Receitas = CREDIT transactions + CREDIT_CARD transactions
+    // Receitas = CREDIT transactions only
     const creditTransactions = filteredPierreTransactions.filter(t => t.type === 'CREDIT');
-    const creditCardTransactions = filteredPierreTransactions.filter(t =>
-      t.type === 'DEBIT' && t.account_subtype === 'CREDIT_CARD'
-    );
-    const creditAndCardTransactions = [...creditTransactions, ...creditCardTransactions];
-    const monthlyReceitas = creditAndCardTransactions.reduce((sum, t) => sum + t.amount, 0);
+    const monthlyReceitas = creditTransactions.reduce((sum, t) => sum + t.amount, 0);
 
-    // Despesas = DEBIT transactions EXCEPT credit card
-    const debitTransactions = filteredPierreTransactions.filter(t =>
-      t.type === 'DEBIT' && t.account_subtype !== 'CREDIT_CARD'
-    );
+    // Despesas = ALL DEBIT transactions (including credit card)
+    const debitTransactions = filteredPierreTransactions.filter(t => t.type === 'DEBIT');
     const monthlyDespesas = debitTransactions.reduce((sum, t) => sum + Math.abs(t.amount), 0);
 
     console.log('[useFinancialSummary] Filtered Pierre Transactions:', {
       totalPierreTransactions: pierreTransactions.length,
       totalFiltered: filteredPierreTransactions.length,
       credits: creditTransactions.length,
-      creditCards: creditCardTransactions.length,
-      totalReceitas: creditAndCardTransactions.length,
       debits: debitTransactions.length,
       creditSum: monthlyReceitas,
       debitSum: monthlyDespesas,
@@ -135,7 +127,7 @@ export function useFinancialSummary(): FinancialSummary & {
         endDate: filters.endDate
       }
     });
-    console.log('[useFinancialSummary] Sample Receitas Transactions (first 5):', creditAndCardTransactions.slice(0, 5).map(t => ({
+    console.log('[useFinancialSummary] Sample Receitas Transactions (first 5):', creditTransactions.slice(0, 5).map(t => ({
       date: t.date,
       amount: t.amount,
       description: t.description,
