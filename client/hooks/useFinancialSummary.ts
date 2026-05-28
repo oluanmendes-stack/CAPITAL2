@@ -81,23 +81,28 @@ export function useFinancialSummary(): FinancialSummary & {
     const filteredTransactions = getFilteredTransactions();
 
     // Filter Pierre transactions locally by the applied filters
-    // This ensures the overview respects the selected date range
+    // If no filters are applied, default to current month only (as per spec: "MOSTRAR SOMENTE DO MÊS ATUAL")
     const filteredPierreTransactions = pierreTransactions.filter(t => {
       const tDate = new Date(t.date);
 
-      if (filters.startDate) {
-        const startDate = new Date(filters.startDate);
-        startDate.setHours(0, 0, 0, 0);
-        if (tDate < startDate) return false;
+      let startDate: Date;
+      let endDate: Date;
+
+      if (filters.startDate && filters.endDate) {
+        // Use applied filters
+        startDate = new Date(filters.startDate);
+        endDate = new Date(filters.endDate);
+      } else {
+        // Default to current month only
+        startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+        endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
       }
 
-      if (filters.endDate) {
-        const endDate = new Date(filters.endDate);
-        endDate.setHours(23, 59, 59, 999);
-        if (tDate > endDate) return false;
-      }
+      // Normalize time boundaries
+      startDate.setHours(0, 0, 0, 0);
+      endDate.setHours(23, 59, 59, 999);
 
-      return true;
+      return tDate >= startDate && tDate <= endDate;
     });
 
     // Use ONLY Pierre transactions for the dashboard overview
