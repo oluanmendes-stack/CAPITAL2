@@ -118,6 +118,7 @@ export const getPierreTransactions: RequestHandler = async (req, res) => {
     params.append('format', format as string);
 
     const url = `${PIERRE_API_BASE}/tools/api/get-transactions?${params.toString()}`;
+    console.log('[Pierre] Fetching transactions from:', url.replace(apiKey, '***'));
 
     const response = await fetch(url, {
       method: 'GET',
@@ -129,17 +130,33 @@ export const getPierreTransactions: RequestHandler = async (req, res) => {
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
+      console.error('[Pierre] API error:', response.status, errorData);
       return res.status(response.status).json({
+        success: false,
         error: 'Failed to fetch transactions',
         details: errorData
       });
     }
 
     const data = await response.json();
-    res.json(data);
+    console.log('[Pierre] Transactions response:', {
+      success: data.success,
+      dataCount: data.data?.length || 0,
+      count: data.count
+    });
+
+    // Ensure consistent response structure
+    res.json({
+      success: data.success || true,
+      data: data.data || [],
+      count: data.count || data.data?.length || 0,
+      filters: data.filters || {},
+      timestamp: data.timestamp || new Date().toISOString()
+    });
   } catch (error) {
-    console.error('Error fetching Pierre transactions:', error);
+    console.error('[Pierre] Error fetching transactions:', error);
     res.status(500).json({
+      success: false,
       error: 'Failed to fetch transactions',
       message: error instanceof Error ? error.message : 'Unknown error'
     });
@@ -150,9 +167,10 @@ export const getPierreBalance: RequestHandler = async (req, res) => {
   try {
     const apiKey = process.env.VITE_PIERRE_API_KEY;
     if (!apiKey) {
-      return res.status(500).json({ error: 'Pierre API key not configured' });
+      return res.status(500).json({ success: false, error: 'Pierre API key not configured' });
     }
 
+    console.log('[Pierre] Fetching balance...');
     const response = await fetch(`${PIERRE_API_BASE}/tools/api/get-balance`, {
       method: 'GET',
       headers: {
@@ -163,17 +181,27 @@ export const getPierreBalance: RequestHandler = async (req, res) => {
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
+      console.error('[Pierre] Balance API error:', response.status, errorData);
       return res.status(response.status).json({
+        success: false,
         error: 'Failed to fetch balance',
         details: errorData
       });
     }
 
     const data = await response.json();
+    console.log('[Pierre] Balance response:', {
+      success: data.success,
+      hasAccounts: !!data.data?.accounts,
+      accountCount: data.data?.accounts?.length || 0,
+      totalBalance: data.data?.total_balance
+    });
+
     res.json(data);
   } catch (error) {
-    console.error('Error fetching Pierre balance:', error);
+    console.error('[Pierre] Error fetching balance:', error);
     res.status(500).json({
+      success: false,
       error: 'Failed to fetch balance',
       message: error instanceof Error ? error.message : 'Unknown error'
     });
