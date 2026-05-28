@@ -91,13 +91,26 @@ export function useFinancialSummary(): FinancialSummary & {
 
     // Use ONLY Pierre transactions for the dashboard overview
     // Local transactions are ignored to match Pierre API data
-    const monthlyReceitas = filteredPierreTransactions
-      .filter(t => t.type === 'CREDIT')
-      .reduce((sum, t) => sum + t.amount, 0);
+    const creditTransactions = filteredPierreTransactions.filter(t => t.type === 'CREDIT');
+    const monthlyReceitas = creditTransactions.reduce((sum, t) => sum + t.amount, 0);
 
-    const monthlyDespesas = filteredPierreTransactions
-      .filter(t => t.type === 'DEBIT')
-      .reduce((sum, t) => sum + Math.abs(t.amount), 0);
+    const debitTransactions = filteredPierreTransactions.filter(t => t.type === 'DEBIT');
+    const monthlyDespesas = debitTransactions.reduce((sum, t) => sum + Math.abs(t.amount), 0);
+
+    console.log('[useFinancialSummary] Filtered Pierre Transactions:', {
+      totalFiltered: filteredPierreTransactions.length,
+      credits: creditTransactions.length,
+      debits: debitTransactions.length,
+      dateRange: {
+        startDate: filters.startDate,
+        endDate: filters.endDate
+      }
+    });
+    console.log('[useFinancialSummary] Credit Transactions:', creditTransactions.map(t => ({
+      date: t.date,
+      amount: t.amount,
+      description: t.description
+    })));
 
     // Saldo respeitando os filtros aplicados
     const saldoMes = monthlyReceitas - monthlyDespesas;
