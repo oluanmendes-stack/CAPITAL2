@@ -181,12 +181,27 @@ export default function CapitalDashboard() {
         params.append('startDate', format(firstDay, 'yyyy-MM-dd'));
         params.append('endDate', format(lastDay, 'yyyy-MM-dd'));
         params.append('format', 'raw');
+        params.append('includeStatus', 'POSTED');
 
         const response = await fetch(`/api/pierre/transactions?${params.toString()}`);
         if (response.ok) {
           const data: PierreTransactionsResponse = await response.json();
           if (data.success) {
-            setPierreTransactionCount((data.data || []).length);
+            const transactions = data.data || [];
+            // Pierre API should already filter by dates, but double-check to ensure only current month
+            const currentMonthTransactions = transactions.filter(t => {
+              try {
+                const tDate = new Date(t.date);
+                const tMonth = tDate.getMonth();
+                const tYear = tDate.getFullYear();
+                const currentMonth = now.getMonth();
+                const currentYear = now.getFullYear();
+                return tMonth === currentMonth && tYear === currentYear;
+              } catch {
+                return false;
+              }
+            });
+            setPierreTransactionCount(currentMonthTransactions.length);
           }
         }
       } catch (error) {

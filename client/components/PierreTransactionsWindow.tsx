@@ -56,6 +56,12 @@ export default function PierreTransactionsWindow({ open = true, onOpenChange }: 
       if (startDate) params.append('startDate', startDate);
       if (endDate) params.append('endDate', endDate);
       params.append('format', 'raw');
+      // Only include POSTED transactions by default, exclude PENDING
+      if (statusFilter !== 'all') {
+        params.append('includeStatus', statusFilter);
+      } else {
+        params.append('includeStatus', 'POSTED');
+      }
 
       const url = `/api/pierre/transactions?${params.toString()}`;
       const response = await fetch(url, {

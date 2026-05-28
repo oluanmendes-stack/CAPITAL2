@@ -38,12 +38,27 @@ export function useFinancialSummary(): FinancialSummary & {
         params.append('startDate', format(firstDay, 'yyyy-MM-dd'));
         params.append('endDate', format(lastDay, 'yyyy-MM-dd'));
         params.append('format', 'raw');
+        params.append('includeStatus', 'POSTED');
 
         const response = await fetch(`/api/pierre/transactions?${params.toString()}`);
         if (response.ok) {
           const data: PierreTransactionsResponse = await response.json();
           if (data.success) {
-            setPierreTransactions(data.data || []);
+            const transactions = data.data || [];
+            // Pierre API should already filter by dates, but double-check to ensure only current month
+            const currentMonthTransactions = transactions.filter(t => {
+              try {
+                const tDate = new Date(t.date);
+                const tMonth = tDate.getMonth();
+                const tYear = tDate.getFullYear();
+                const currentMonth = now.getMonth();
+                const currentYear = now.getFullYear();
+                return tMonth === currentMonth && tYear === currentYear;
+              } catch {
+                return false;
+              }
+            });
+            setPierreTransactions(currentMonthTransactions);
           }
         }
       } catch (error) {
@@ -63,13 +78,9 @@ export function useFinancialSummary(): FinancialSummary & {
     // Obter transações filtradas (respeita os filtros de data)
     const filteredTransactions = getFilteredTransactions();
 
-    // Pierre transactions: ALWAYS use current month, ignore custom filters
+    // Pierre transactions already filtered in useEffect to current month
     // This ensures the "Saldo Mês Atual" always shows current month data
-    let filteredPierreTransactions = pierreTransactions.filter(t => {
-      const transactionDate = new Date(t.date);
-      return transactionDate.getMonth() === currentMonth &&
-             transactionDate.getFullYear() === currentYear;
-    });
+    const filteredPierreTransactions = pierreTransactions;
 
     // Use ONLY Pierre transactions for the dashboard overview
     // Local transactions are ignored to match Pierre API data
