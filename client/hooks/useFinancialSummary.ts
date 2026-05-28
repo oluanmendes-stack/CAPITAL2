@@ -82,26 +82,31 @@ export function useFinancialSummary(): FinancialSummary & {
 
     // Filter Pierre transactions locally by the applied filters
     // If no filters are applied, default to current month only (as per spec: "MOSTRAR SOMENTE DO MÊS ATUAL")
+    let startDate: Date;
+    let endDate: Date;
+
+    if (filters.startDate && filters.endDate) {
+      // Use applied filters
+      startDate = new Date(filters.startDate);
+      endDate = new Date(filters.endDate);
+    } else {
+      // Default to current month only
+      startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+      endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    }
+
+    // Normalize time boundaries
+    startDate.setHours(0, 0, 0, 0);
+    endDate.setHours(23, 59, 59, 999);
+
+    console.log('[useFinancialSummary] Filter date range:', {
+      startDate: startDate.toISOString(),
+      endDate: endDate.toISOString(),
+      filters: filters
+    });
+
     const filteredPierreTransactions = pierreTransactions.filter(t => {
       const tDate = new Date(t.date);
-
-      let startDate: Date;
-      let endDate: Date;
-
-      if (filters.startDate && filters.endDate) {
-        // Use applied filters
-        startDate = new Date(filters.startDate);
-        endDate = new Date(filters.endDate);
-      } else {
-        // Default to current month only
-        startDate = new Date(now.getFullYear(), now.getMonth(), 1);
-        endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-      }
-
-      // Normalize time boundaries
-      startDate.setHours(0, 0, 0, 0);
-      endDate.setHours(23, 59, 59, 999);
-
       return tDate >= startDate && tDate <= endDate;
     });
 
@@ -135,7 +140,16 @@ export function useFinancialSummary(): FinancialSummary & {
         endDate: filters.endDate
       }
     });
-    console.log('[useFinancialSummary] Sample Receitas Transactions (first 5):', creditAndCardTransactions.slice(0, 5).map(t => ({
+    console.log('[useFinancialSummary] ALL Receitas Transactions:', creditAndCardTransactions.map(t => ({
+      date: t.date,
+      amount: t.amount,
+      description: t.description,
+      account_type: t.account_type,
+      account_subtype: t.account_subtype,
+      type: t.type
+    })));
+
+    console.log('[useFinancialSummary] ALL Despesas Transactions:', debitTransactions.map(t => ({
       date: t.date,
       amount: t.amount,
       description: t.description,
