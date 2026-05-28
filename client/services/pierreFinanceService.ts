@@ -88,6 +88,8 @@ class PierreFinanceService {
     if (accountType) params.append('accountType', accountType);
     if (accountSubtype) params.append('accountSubtype', accountSubtype);
     params.append('format', 'raw');
+    // Only include POSTED transactions, exclude PENDING
+    params.append('includeStatus', 'POSTED');
 
     const url = this.useServerProxy
       ? `/api/pierre/transactions?${params.toString()}`
