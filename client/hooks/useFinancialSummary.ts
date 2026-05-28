@@ -26,16 +26,16 @@ export function useFinancialSummary(): FinancialSummary & {
 
   const [pierreTransactions, setPierreTransactions] = useState<PierreTransaction[]>([]);
 
-  // Fetch Pierre transactions for current month
+  // Fetch Pierre transactions - always fetch a larger window, filter locally
   useEffect(() => {
     const fetchPierreTransactions = async () => {
       try {
         const now = new Date();
-        const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
-        const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
 
-        const startDateStr = format(firstDay, 'yyyy-MM-dd');
-        const endDateStr = format(lastDay, 'yyyy-MM-dd');
+        // Always fetch last 3 months to have enough data
+        const startDate = subMonths(now, 3);
+        const startDateStr = format(startDate, 'yyyy-MM-dd');
+        const endDateStr = format(now, 'yyyy-MM-dd');
 
         const params = new URLSearchParams();
         params.append('startDate', startDateStr);
@@ -57,50 +57,7 @@ export function useFinancialSummary(): FinancialSummary & {
         console.log('[useFinancialSummary] Total transactions from API:', data.data?.length || 0);
 
         if (data.success && Array.isArray(data.data)) {
-          const transactions = data.data;
-
-          // Separate by type before filtering
-          const creditsBeforeFilter = transactions.filter(t => t.type === 'CREDIT');
-          const debitsBeforeFilter = transactions.filter(t => t.type === 'DEBIT');
-          const creditsSumBeforeFilter = creditsBeforeFilter.reduce((sum, t) => sum + t.amount, 0);
-          const debitsSumBeforeFilter = debitsBeforeFilter.reduce((sum, t) => sum + t.amount, 0);
-
-          console.log('[useFinancialSummary] Before date filter:', {
-            total: transactions.length,
-            credits: creditsBeforeFilter.length,
-            creditsSum: creditsSumBeforeFilter,
-            debits: debitsBeforeFilter.length,
-            debitsSum: debitsSumBeforeFilter
-          });
-
-          // Double-check month filter
-          const currentMonthTransactions = transactions.filter(t => {
-            try {
-              const tDate = new Date(t.date);
-              const tMonth = tDate.getMonth();
-              const tYear = tDate.getFullYear();
-              const currentMonth = now.getMonth();
-              const currentYear = now.getFullYear();
-              return tMonth === currentMonth && tYear === currentYear;
-            } catch {
-              return false;
-            }
-          });
-
-          const creditsAfterFilter = currentMonthTransactions.filter(t => t.type === 'CREDIT');
-          const debitsAfterFilter = currentMonthTransactions.filter(t => t.type === 'DEBIT');
-          const creditsSumAfterFilter = creditsAfterFilter.reduce((sum, t) => sum + t.amount, 0);
-          const debitsSumAfterFilter = debitsAfterFilter.reduce((sum, t) => sum + Math.abs(t.amount), 0);
-
-          console.log('[useFinancialSummary] After date filter:', {
-            total: currentMonthTransactions.length,
-            credits: creditsAfterFilter.length,
-            creditsSum: creditsSumAfterFilter,
-            debits: debitsAfterFilter.length,
-            debitsSum: debitsSumAfterFilter
-          });
-
-          setPierreTransactions(currentMonthTransactions);
+          setPierreTransactions(data.data);
         } else {
           console.warn('[useFinancialSummary] Pierre API returned unsuccessful response:', data);
           setPierreTransactions([]);
@@ -123,19 +80,69 @@ export function useFinancialSummary(): FinancialSummary & {
     // Obter transações filtradas (respeita os filtros de data)
     const filteredTransactions = getFilteredTransactions();
 
-    // Pierre transactions already filtered in useEffect to current month
-    // This ensures the "Saldo Mês Atual" always shows current month data
-    const filteredPierreTransactions = pierreTransactions;
+    // Filter Pierre transactions locally by the applied filters
+    // If no filters are applied, default to current month only (as per spec: "MOSTRAR SOMENTE DO MÊS ATUAL")
+    const filteredPierreTransactions = pierreTransactions.filter(t => {
+      const tDate = new Date(t.date);
+
+      let startDate: Date;
+      let endDate: Date;
+
+      if (filters.startDate && filters.endDate) {
+        // Use applied filters
+        startDate = new Date(filters.startDate);
+        endDate = new Date(filters.endDate);
+      } else {
+        // Default to current month only
+        startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+        endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+      }
+
+      // Normalize time boundaries
+      startDate.setHours(0, 0, 0, 0);
+      endDate.setHours(23, 59, 59, 999);
+
+      return tDate >= startDate && tDate <= endDate;
+    });
 
     // Use ONLY Pierre transactions for the dashboard overview
     // Local transactions are ignored to match Pierre API data
-    const monthlyReceitas = filteredPierreTransactions
-      .filter(t => t.type === 'CREDIT')
-      .reduce((sum, t) => sum + t.amount, 0);
+    // Receitas = CREDIT transactions + CREDIT_CARD transactions
+    const creditTransactions = filteredPierreTransactions.filter(t => t.type === 'CREDIT');
+    const creditCardTransactions = filteredPierreTransactions.filter(t =>
+      t.type === 'DEBIT' && t.account_subtype === 'CREDIT_CARD'
+    );
+    const creditAndCardTransactions = [...creditTransactions, ...creditCardTransactions];
+    const monthlyReceitas = creditAndCardTransactions.reduce((sum, t) => sum + t.amount, 0);
 
-    const monthlyDespesas = filteredPierreTransactions
-      .filter(t => t.type === 'DEBIT')
-      .reduce((sum, t) => sum + Math.abs(t.amount), 0);
+    // Despesas = DEBIT transactions EXCEPT credit card
+    const debitTransactions = filteredPierreTransactions.filter(t =>
+      t.type === 'DEBIT' && t.account_subtype !== 'CREDIT_CARD'
+    );
+    const monthlyDespesas = debitTransactions.reduce((sum, t) => sum + Math.abs(t.amount), 0);
+
+    console.log('[useFinancialSummary] Filtered Pierre Transactions:', {
+      totalPierreTransactions: pierreTransactions.length,
+      totalFiltered: filteredPierreTransactions.length,
+      credits: creditTransactions.length,
+      creditCards: creditCardTransactions.length,
+      totalReceitas: creditAndCardTransactions.length,
+      debits: debitTransactions.length,
+      creditSum: monthlyReceitas,
+      debitSum: monthlyDespesas,
+      dateRange: {
+        startDate: filters.startDate,
+        endDate: filters.endDate
+      }
+    });
+    console.log('[useFinancialSummary] Sample Receitas Transactions (first 5):', creditAndCardTransactions.slice(0, 5).map(t => ({
+      date: t.date,
+      amount: t.amount,
+      description: t.description,
+      account_type: t.account_type,
+      account_subtype: t.account_subtype,
+      type: t.type
+    })));
 
     // Saldo respeitando os filtros aplicados
     const saldoMes = monthlyReceitas - monthlyDespesas;
@@ -163,7 +170,7 @@ export function useFinancialSummary(): FinancialSummary & {
     const availableBalanceMonth = saldoMes - allocatedToGoals;
     const availableBalanceTotal = totalWithFGTS - allocatedToGoals;
 
-    // Pierre-only values for dashboard display (always current month)
+    // Pierre-only values for dashboard display (respects applied filters)
     const pierreReceitas = monthlyReceitas;
     const pierreDespesas = monthlyDespesas;
 
