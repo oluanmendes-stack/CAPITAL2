@@ -84,32 +84,59 @@ export function useFinancialSummary(): FinancialSummary & {
     // This ensures the overview respects the selected date range
     const filteredPierreTransactions = pierreTransactions.filter(t => {
       const tDate = new Date(t.date);
-      if (filters.startDate && tDate < new Date(filters.startDate)) return false;
-      if (filters.endDate && tDate > new Date(filters.endDate)) return false;
+
+      if (filters.startDate) {
+        const startDate = new Date(filters.startDate);
+        startDate.setHours(0, 0, 0, 0);
+        if (tDate < startDate) return false;
+      }
+
+      if (filters.endDate) {
+        const endDate = new Date(filters.endDate);
+        endDate.setHours(23, 59, 59, 999);
+        if (tDate > endDate) return false;
+      }
+
       return true;
     });
 
     // Use ONLY Pierre transactions for the dashboard overview
     // Local transactions are ignored to match Pierre API data
+    // Receitas = CREDIT transactions + CREDIT_CARD transactions
     const creditTransactions = filteredPierreTransactions.filter(t => t.type === 'CREDIT');
-    const monthlyReceitas = creditTransactions.reduce((sum, t) => sum + t.amount, 0);
+    const creditCardTransactions = filteredPierreTransactions.filter(t =>
+      t.type === 'DEBIT' && t.account_subtype === 'CREDIT_CARD'
+    );
+    const creditAndCardTransactions = [...creditTransactions, ...creditCardTransactions];
+    const monthlyReceitas = creditAndCardTransactions.reduce((sum, t) => sum + t.amount, 0);
 
-    const debitTransactions = filteredPierreTransactions.filter(t => t.type === 'DEBIT');
+    // Despesas = DEBIT transactions EXCEPT credit card
+    const debitTransactions = filteredPierreTransactions.filter(t =>
+      t.type === 'DEBIT' && t.account_subtype !== 'CREDIT_CARD'
+    );
     const monthlyDespesas = debitTransactions.reduce((sum, t) => sum + Math.abs(t.amount), 0);
 
     console.log('[useFinancialSummary] Filtered Pierre Transactions:', {
+      totalPierreTransactions: pierreTransactions.length,
       totalFiltered: filteredPierreTransactions.length,
       credits: creditTransactions.length,
+      creditCards: creditCardTransactions.length,
+      totalReceitas: creditAndCardTransactions.length,
       debits: debitTransactions.length,
+      creditSum: monthlyReceitas,
+      debitSum: monthlyDespesas,
       dateRange: {
         startDate: filters.startDate,
         endDate: filters.endDate
       }
     });
-    console.log('[useFinancialSummary] Credit Transactions:', creditTransactions.map(t => ({
+    console.log('[useFinancialSummary] Sample Receitas Transactions (first 5):', creditAndCardTransactions.slice(0, 5).map(t => ({
       date: t.date,
       amount: t.amount,
-      description: t.description
+      description: t.description,
+      account_type: t.account_type,
+      account_subtype: t.account_subtype,
+      type: t.type
     })));
 
     // Saldo respeitando os filtros aplicados
