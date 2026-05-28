@@ -34,6 +34,7 @@ import BudgetDivision from '../components/BudgetDivision';
 import ExpensePieChart from '../components/charts/ExpensePieChart';
 import MonthlyBarChart from '../components/charts/MonthlyBarChart';
 import TrendLineChart from '../components/charts/TrendLineChart';
+import { PierreDebug } from '../components/PierreDebug';
 import {
   TrendingUp,
   TrendingDown,
@@ -1372,6 +1373,9 @@ export default function CapitalDashboard() {
                 </div>
               </CardContent>
             </Card>
+
+            {/* Debug Pierre Finance */}
+            <PierreDebug />
 
             {/* Gerenciamento FGTS */}
             <Card>

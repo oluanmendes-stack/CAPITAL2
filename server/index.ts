@@ -3,7 +3,7 @@ import express from "express";
 import cors from "cors";
 import { handleDemo } from "./routes/demo";
 import { handleQuote } from "./routes/quote";
-import { getPierreAccounts, getPierreBalance, getPierreTransactions, getPierreBills, getPierreBillSummary, getPierreInstallments, syncPierreData } from "./routes/pierre";
+import { getPierreAccounts, getPierreBalance, getPierreTransactions, getPierreBills, getPierreBillSummary, getPierreInstallments, syncPierreData, debugFilteredTransactions } from "./routes/pierre";
 
 export function createServer() {
   const app = express();
@@ -30,6 +30,7 @@ export function createServer() {
   app.get("/api/pierre/bill-summary", getPierreBillSummary);
   app.get("/api/pierre/installments", getPierreInstallments);
   app.get("/api/pierre/sync", syncPierreData);
+  app.get("/api/pierre/debug-current-month", debugFilteredTransactions);
 
   return app;
 }

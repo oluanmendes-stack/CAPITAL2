@@ -41,28 +41,39 @@ export function useFinancialSummary(): FinancialSummary & {
         params.append('includeStatus', 'POSTED');
 
         const response = await fetch(`/api/pierre/transactions?${params.toString()}`);
-        if (response.ok) {
-          const data: PierreTransactionsResponse = await response.json();
-          if (data.success) {
-            const transactions = data.data || [];
-            // Pierre API should already filter by dates, but double-check to ensure only current month
-            const currentMonthTransactions = transactions.filter(t => {
-              try {
-                const tDate = new Date(t.date);
-                const tMonth = tDate.getMonth();
-                const tYear = tDate.getFullYear();
-                const currentMonth = now.getMonth();
-                const currentYear = now.getFullYear();
-                return tMonth === currentMonth && tYear === currentYear;
-              } catch {
-                return false;
-              }
-            });
-            setPierreTransactions(currentMonthTransactions);
-          }
+        if (!response.ok) {
+          console.error('Pierre API error response:', response.status, response.statusText);
+          setPierreTransactions([]);
+          return;
+        }
+
+        const data: PierreTransactionsResponse = await response.json();
+        console.log('Pierre API response:', data);
+
+        if (data.success && data.data) {
+          const transactions = Array.isArray(data.data) ? data.data : [];
+          // Pierre API should already filter by dates, but double-check to ensure only current month
+          const currentMonthTransactions = transactions.filter(t => {
+            try {
+              const tDate = new Date(t.date);
+              const tMonth = tDate.getMonth();
+              const tYear = tDate.getFullYear();
+              const currentMonth = now.getMonth();
+              const currentYear = now.getFullYear();
+              return tMonth === currentMonth && tYear === currentYear;
+            } catch {
+              return false;
+            }
+          });
+          console.log('Filtered Pierre transactions:', currentMonthTransactions);
+          setPierreTransactions(currentMonthTransactions);
+        } else {
+          console.warn('Pierre API returned unsuccessful response:', data);
+          setPierreTransactions([]);
         }
       } catch (error) {
         console.error('Error fetching Pierre transactions:', error);
+        setPierreTransactions([]);
       }
     };
 
@@ -90,7 +101,7 @@ export function useFinancialSummary(): FinancialSummary & {
 
     const monthlyDespesas = filteredPierreTransactions
       .filter(t => t.type === 'DEBIT')
-      .reduce((sum, t) => sum + t.amount, 0);
+      .reduce((sum, t) => sum + Math.abs(t.amount), 0);
 
     // Saldo respeitando os filtros aplicados
     const saldoMes = monthlyReceitas - monthlyDespesas;
